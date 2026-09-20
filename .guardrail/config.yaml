@@ -20,7 +20,7 @@ laya:
   model: convaiinnovations/laya-typed-decisions
   daemon_url: http://127.0.0.1:8765
   timeout_seconds: 3.0
-  device: cpu
+  device: gpu
   thresholds:
     confidence: 0.80
     destructive: 0.85
