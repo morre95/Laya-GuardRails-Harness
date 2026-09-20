@@ -143,16 +143,25 @@ User units stop at logout unless lingering is on. For boot without a graphical s
 loginctl enable-linger "$USER"
 ```
 
-The daemon only serves `/predict`. Traces are written when Claude Code hooks run (`lgh install-hooks --user` for every project). Shadow mode plus a resident daemon means those traces include a Laya assessment instead of `Connection refused`. That is still a **decision log**, not a labelled fine-tune set — use `lgh label` / `lgh export-dataset` for gold labels, and never train on Laya's own predictions.
+The daemon only serves `/predict`. It does **not** attach LGH to a coding agent. For traces you still have to install Claude Code hooks (next section). Shadow mode plus a resident daemon means those traces include a Laya assessment instead of `Connection refused`. That is still a **decision log**, not a labelled fine-tune set — use `lgh label` / `lgh export-dataset` for gold labels, and never train on Laya's own predictions.
 
 ## Claude Code hooks
 
+A running daemon is not enough. Claude Code only calls LGH after hooks are registered. **The first time you work in a repo**, `cd` into that repo and run:
+
 ```bash
-uv run lgh install-hooks --user     # ~/.claude/settings.json
-uv run lgh install-hooks --project  # ./.claude/settings.json
+lgh install-hooks --project
 ```
 
-Registers `PreToolUse`, `PostToolUse`, and `Stop` with `lgh hook pre|post|stop`. Installation is idempotent and writes a `.lgh.bak` backup.
+That writes `./.claude/settings.json` with `PreToolUse` / `PostToolUse` / `Stop` → `lgh hook pre|post|stop`. Do this once per repo (idempotent; writes a `.lgh.bak` backup). Use the `lgh` on `PATH` from `uv tool install`, **inside the target repo** — `uv run lgh` from the LGH clone does not install hooks into the other project, and the other project's `uv run` usually cannot see `lgh`.
+
+To cover every Claude Code project with one command instead:
+
+```bash
+lgh install-hooks --user    # ~/.claude/settings.json
+```
+
+`lgh` must stay on `PATH` when Claude Code starts; the hook command is literally `lgh hook pre`. Cursor does not read these files. Optional `.guardrail/` in the target repo only tightens policy.
 
 Watch traces:
 
