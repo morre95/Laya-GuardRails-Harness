@@ -47,8 +47,8 @@ def main(argv: list[str] | None = None) -> int:
     export.add_argument("--output", type=Path, required=True)
 
     tail = sub.add_parser("trace", help="Inspect traces")
-    tail.add_argument("action", choices=["tail"])
-    tail.add_argument("-n", type=int, default=20)
+    tail.add_argument("action", choices=["tail", "watch"])
+    tail.add_argument("-n", type=int, default=20, help="backlog records; 0 starts watch on an empty screen")
 
     args = parser.parse_args(argv)
     if args.cmd == "hook":
@@ -66,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "export-dataset":
         return _export(args)
     if args.cmd == "trace":
+        if args.action == "watch":
+            return _trace_watch(args.n)
         return _trace_tail(args.n)
     return 1
 
@@ -195,6 +197,22 @@ def _trace_tail(n: int) -> int:
                 }
             )
         )
+    return 0
+
+
+def _trace_watch(backlog: int) -> int:
+    from lgh.paths import traces_dir
+    from lgh.trace.watch import follow_traces, format_trace
+
+    color = sys.stdout.isatty()
+    print(f"watching {traces_dir()} — Ctrl-C to stop", file=sys.stderr)
+    previous = None
+    try:
+        for trace in follow_traces(backlog=backlog):
+            print(format_trace(trace, previous=previous, color=color), flush=True)
+            previous = trace
+    except KeyboardInterrupt:
+        return 0
     return 0
 
 

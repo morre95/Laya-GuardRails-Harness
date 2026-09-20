@@ -87,8 +87,14 @@ Registers `PreToolUse`, `PostToolUse`, and `Stop` with `lgh hook pre|post|stop`.
 Watch traces:
 
 ```bash
-uv run lgh trace tail
+uv run lgh trace tail            # last 20 records as JSON
+uv run lgh trace watch -n 0      # follow live, one line per decision
 ```
+
+`trace watch` follows the trace log as hooks write to it, naming the rules that
+matched and colouring the decision. Run it in a second terminal while a coding
+agent works in any repo. The post hook re-appends a decision once the tool has
+run, so those records render as an `↳ executed exit=N` line under their decision.
 
 Traces: `~/.local/share/lgh/traces/*.jsonl`  
 Session state: `~/.local/state/lgh/sessions/`  

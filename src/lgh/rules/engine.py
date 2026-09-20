@@ -383,6 +383,11 @@ def _load_builtin() -> tuple[dict[str, Any], ...]:
     return tuple(raw.get("rules") or [])
 
 
+def rule_descriptions() -> dict[str, str]:
+    """Built-in rule id -> description, for display."""
+    return {str(rule["id"]): str(rule.get("description") or "") for rule in _load_builtin()}
+
+
 def _parse(envelope: ActionEnvelope) -> list[ParsedCommand]:
     command = envelope.action.command
     if not command:
