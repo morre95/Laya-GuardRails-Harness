@@ -1,0 +1,157 @@
+version: "0.1"
+rules:
+  - id: R001
+    category: secrets
+    description: write .env
+    disposition: HUMAN
+    evaluator: write_env
+
+  - id: R002
+    category: secrets
+    description: write *.pem
+    disposition: BLOCK
+    evaluator: write_pem
+
+  - id: R003
+    category: secrets
+    description: write ~/.ssh/*
+    disposition: BLOCK
+    evaluator: write_ssh
+
+  - id: R004
+    category: secrets
+    description: read known secret stores
+    disposition: HUMAN
+    evaluator: read_secrets
+
+  - id: R010
+    category: destructive
+    description: rm -rf /
+    disposition: BLOCK
+    evaluator: rm_root
+
+  - id: R011
+    category: destructive
+    description: rm -rf ~
+    disposition: BLOCK
+    evaluator: rm_home
+
+  - id: R012
+    category: destructive
+    description: recursive delete outside repo
+    disposition: BLOCK
+    evaluator: rm_outside_repo
+
+  - id: R013
+    category: destructive
+    description: delete above configured threshold
+    disposition: HUMAN
+    evaluator: delete_threshold
+
+  - id: R020
+    category: git
+    description: git status
+    disposition: ALLOW
+    evaluator: git_readonly
+    git_subcommands: [status]
+
+  - id: R021
+    category: git
+    description: git diff
+    disposition: ALLOW
+    evaluator: git_readonly
+    git_subcommands: [diff]
+
+  - id: R022
+    category: git
+    description: git log
+    disposition: ALLOW
+    evaluator: git_readonly
+    git_subcommands: [log, show]
+
+  - id: R023
+    category: git
+    description: git reset --hard
+    disposition: HUMAN
+    evaluator: git_reset_hard
+
+  - id: R024
+    category: git
+    description: git clean -fd
+    disposition: HUMAN
+    evaluator: git_clean
+
+  - id: R025
+    category: git
+    description: git push --force
+    disposition: HUMAN
+    evaluator: git_force_push
+
+  - id: R026
+    category: git
+    description: push directly to protected branch
+    disposition: HUMAN
+    evaluator: git_protected_push
+
+  - id: R030
+    category: package
+    description: known test command
+    disposition: ALLOW
+    evaluator: known_command
+    command_kind: test
+
+  - id: R031
+    category: package
+    description: known lint command
+    disposition: ALLOW
+    evaluator: known_command
+    command_kind: lint
+
+  - id: R032
+    category: package
+    description: known typecheck
+    disposition: ALLOW
+    evaluator: known_command
+    command_kind: typecheck
+
+  - id: R033
+    category: package
+    description: package installation
+    disposition: PASS
+    evaluator: package_install
+
+  - id: R040
+    category: environment
+    description: production mutation
+    disposition: HUMAN
+    evaluator: production_mutation
+
+  - id: R041
+    category: environment
+    description: production database mutation
+    disposition: HUMAN
+    evaluator: production_database
+
+  - id: R042
+    category: environment
+    description: unknown environment plus risky action
+    disposition: PASS
+    evaluator: unknown_risky
+
+  - id: R050
+    category: integrity
+    description: modify LGH rules
+    disposition: HUMAN
+    evaluator: modify_lgh_rules
+
+  - id: R051
+    category: integrity
+    description: modify LGH configuration
+    disposition: HUMAN
+    evaluator: modify_lgh_config
+
+  - id: R052
+    category: integrity
+    description: disable or bypass hooks
+    disposition: BLOCK
+    evaluator: bypass_hooks

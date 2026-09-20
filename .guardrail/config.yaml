@@ -1,0 +1,39 @@
+version: "0.1"
+
+mode: shadow
+
+environment:
+  production_branches:
+    - main
+    - production
+
+protected_paths:
+  - ".github/**"
+  - "infra/**"
+  - "migrations/**"
+  - "src/lgh/rules/**"
+
+protected_branches:
+  - main
+
+laya:
+  model: convaiinnovations/laya-typed-decisions
+  daemon_url: http://127.0.0.1:8765
+  timeout_seconds: 3.0
+  device: cpu
+  thresholds:
+    confidence: 0.80
+    destructive: 0.85
+    sensitive: 0.85
+    external_impact: 0.85
+    verification: 0.70
+
+review:
+  frontier_enabled: true
+
+human:
+  production_mutations: always
+
+# Stepwise enforcement: keep global mode shadow, then list categories
+# such as [git, secrets, integrity] to enforce those first.
+enforce_categories: []
