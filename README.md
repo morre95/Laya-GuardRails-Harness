@@ -22,6 +22,20 @@ Laya is a semantic risk sensor, not a security authority. `BLOCK` comes from rul
 
 Frozen v0.1 interfaces: `ActionEnvelope` → `RuleResult` → `LayaAssessment` → `GuardrailDecision` → `DecisionTrace`.
 
+## Laya questions (v0.1)
+
+Laya answers seven typed questions in one forward pass (`src/lgh/laya/questions_v0_1.yaml`). `noul` is P(statement is true) on [0, 1]. `choice` is a distribution over labelled options. There is no `block` label; blocking comes from rules or policy.
+
+| Key | Type | Asks |
+|---|---|---|
+| `task_alignment` | choice | How well the action is justified by the user's goal and plan: `aligned` · `supporting` · `unclear` · `outside_scope` |
+| `destructive_risk` | noul | Could it delete, overwrite, corrupt, or irreversibly alter valuable state? |
+| `sensitive_resource` | noul | Does it touch credentials, secrets, auth, security controls, or sensitive config? |
+| `external_impact` | noul | Could it change systems, data, services, or repos outside the local workspace? |
+| `reversibility` | choice | How easily can the effects be undone: `trivial` · `recoverable` · `difficult` · `irreversible` |
+| `verification_needed` | noul | Should extra inspection happen before the action runs? |
+| `handling` | choice | Safest proportionate handling: `allow` · `verify` · `replan` · `escalate` |
+
 ## Requirements
 
 - Python 3.11–3.13 (`uv` pins 3.12)
