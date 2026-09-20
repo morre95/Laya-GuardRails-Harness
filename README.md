@@ -34,10 +34,9 @@ Frozen v0.1 interfaces: `ActionEnvelope` → `RuleResult` → `LayaAssessment` �
 ```bash
 uv python pin 3.12
 uv sync --extra dev
-uv pip install -e .
 ```
 
-With the Laya daemon extra:
+The Laya daemon extra pulls torch and the model runtime. Keep it on the same `uv sync` line or uv will **uninstall** it:
 
 ```bash
 uv sync --extra dev --extra laya
@@ -56,10 +55,13 @@ Or `uv tool install .`
 The hook process is a thin client. The model stays resident in a localhost-only daemon (cold start is several seconds).
 
 ```bash
+uv sync --extra dev --extra laya
 USE_TF=0 uv run lgh daemon start
 uv run lgh daemon status
 uv run lgh daemon stop
 ```
+
+Cold start downloads `convaiinnovations/laya-typed-decisions` on first run and can take a minute on CPU. Hooks still work in shadow mode if the daemon is down.
 
 Binds `127.0.0.1:8765` with `POST /predict`, `GET /health`, `POST /tokens`.
 

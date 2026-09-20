@@ -88,7 +88,11 @@ def _daemon(args: argparse.Namespace) -> int:
     from lgh import daemon as daemon_mod
 
     if args.action == "start":
-        daemon_mod.start(host=args.host, port=args.port, device=args.device)
+        try:
+            daemon_mod.start(host=args.host, port=args.port, device=args.device)
+        except daemon_mod.DaemonError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         print(daemon_mod.status_text(args.host, args.port))
         return 0
     if args.action == "stop":

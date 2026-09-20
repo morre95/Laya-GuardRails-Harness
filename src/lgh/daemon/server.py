@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,19 +14,40 @@ MODEL_ID = "convaiinnovations/laya-typed-decisions"
 _AGENT: Any = None
 _LOADED_AT: str | None = None
 _MODEL = MODEL_ID
+_LOAD_ERROR: str | None = None
+_LOADING = False
 
 
 def load_agent(model: str = MODEL_ID, device: str = "cpu") -> Any:
-    global _AGENT, _LOADED_AT, _MODEL
+    global _AGENT, _LOADED_AT, _MODEL, _LOAD_ERROR, _LOADING
     if _AGENT is not None:
         return _AGENT
+    _LOADING = True
     os.environ["USE_TF"] = "0"
-    import laya  # type: ignore[import-untyped]
+    try:
+        import laya  # type: ignore[import-untyped]
 
-    _AGENT = laya.load(model)
-    _MODEL = model
-    _LOADED_AT = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    return _AGENT
+        _AGENT = laya.load(model)
+        _MODEL = model
+        _LOADED_AT = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        _LOAD_ERROR = None
+        return _AGENT
+    except Exception as exc:
+        _LOAD_ERROR = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        _LOADING = False
+
+
+def health_payload() -> dict[str, Any]:
+    return {
+        "ok": _AGENT is not None,
+        "loading": _LOADING and _AGENT is None,
+        "error": _LOAD_ERROR,
+        "model": _MODEL,
+        "loadedAt": _LOADED_AT,
+        "tokenizer": _AGENT is not None,
+    }
 
 
 def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict[str, Any]) -> None:
@@ -47,16 +69,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.split("?", 1)[0] != "/health":
             _json_response(self, 404, {"error": "not found"})
             return
-        _json_response(
-            self,
-            200,
-            {
-                "ok": _AGENT is not None,
-                "model": _MODEL,
-                "loadedAt": _LOADED_AT,
-                "tokenizer": True,
-            },
-        )
+        payload = health_payload()
+        _json_response(self, 200, payload)
 
     def do_POST(self) -> None:  # noqa: N802
         length = int(self.headers.get("Content-Length") or 0)
@@ -82,6 +96,12 @@ class Handler(BaseHTTPRequestHandler):
         if path != "/predict":
             _json_response(self, 404, {"error": "not found"})
             return
+        if _LOAD_ERROR:
+            _json_response(self, 503, {"error": _LOAD_ERROR})
+            return
+        if _AGENT is None:
+            _json_response(self, 503, {"error": "model still loading"})
+            return
         try:
             agent = load_agent()
             started = time.perf_counter()
@@ -101,6 +121,18 @@ class Handler(BaseHTTPRequestHandler):
 
 def serve(host: str = "127.0.0.1", port: int = 8765, preload: bool = True, device: str = "cpu") -> None:
     if preload:
-        load_agent(device=device)
+        threading.Thread(
+            target=_preload,
+            kwargs={"device": device},
+            name="lgh-laya-load",
+            daemon=True,
+        ).start()
     httpd = ThreadingHTTPServer((host, port), Handler)
     httpd.serve_forever()
+
+
+def _preload(device: str = "cpu") -> None:
+    try:
+        load_agent(device=device)
+    except Exception:
+        traceback.print_exc()
