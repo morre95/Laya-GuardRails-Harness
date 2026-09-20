@@ -17,6 +17,14 @@ _MODEL = MODEL_ID
 _LOAD_ERROR: str | None = None
 _LOADING = False
 
+# Config/docs historically used "gpu"; torch.device() wants "cuda".
+_DEVICE_ALIASES = {"gpu": "cuda"}
+
+
+def resolve_device(device: str) -> str:
+    key = device.strip().lower()
+    return _DEVICE_ALIASES.get(key, key)
+
 
 def load_agent(model: str = MODEL_ID, device: str = "cpu") -> Any:
     global _AGENT, _LOADED_AT, _MODEL, _LOAD_ERROR, _LOADING
@@ -27,7 +35,7 @@ def load_agent(model: str = MODEL_ID, device: str = "cpu") -> Any:
     try:
         import laya  # type: ignore[import-untyped]
 
-        _AGENT = laya.load(model, device=device)
+        _AGENT = laya.load(model, device=resolve_device(device))
         _MODEL = model
         _LOADED_AT = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         _LOAD_ERROR = None

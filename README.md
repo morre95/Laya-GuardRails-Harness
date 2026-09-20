@@ -62,10 +62,11 @@ CLI:
 uv run lgh --help
 ```
 
-Or install the CLI on `PATH` (needed for Claude Code hooks and a systemd unit). Include the Laya extra or the tool env will not be able to load the model:
+Or install the CLI on `PATH` (needed for Claude Code hooks and a systemd unit). `uv tool install` does **not** read `[project.optional-dependencies]`; pass the model runtime with `--with` or the tool env will only have `lgh` (systemd then fails with `No module named 'laya'`):
 
 ```bash
-uv tool install ".[laya]"
+uv tool install --force --with laya .
+"$(uv tool dir)/lgh/bin/python" -c "import laya; print('ok')"
 ```
 
 ## Run the Laya daemon
@@ -89,7 +90,7 @@ If the daemon is down: shadow mode logs the failure and does not interfere; enfo
 
 `lgh daemon start` is a launcher: it forks `python -m lgh.daemon`, waits until `/health` is ok, then **exits**. Do not use it as `ExecStart` with `Type=simple` — systemd will think the service died. Run the HTTP server in the foreground instead.
 
-1. Install the CLI into a stable tool env (see above): `uv tool install ".[laya]"`.
+1. Install the CLI into a stable tool env (see above): `uv tool install --force --with laya .`. Confirm `import laya` in that interpreter before enabling the unit.
 2. Confirm the interpreter that has `laya` / torch:
 
 ```bash
@@ -122,7 +123,7 @@ TimeoutStartSec=180
 WantedBy=default.target
 ```
 
-Adjust `ExecStart` if `uv tool dir` is not `~/.local/share/uv/tools`, change `--port` to match `daemon_url`, and use `--device gpu` when you have CUDA.
+Adjust `ExecStart` if `uv tool dir` is not `~/.local/share/uv/tools`, change `--port` to match `daemon_url`, and use `--device cuda` when you have an NVIDIA GPU (`gpu` is accepted as an alias). Torch does not understand the string `gpu`.
 
 Without `uv tool install`, point `ExecStart` at this clone's `.venv/bin/python -m lgh.daemon ...`. That unit breaks if you move or delete the clone.
 

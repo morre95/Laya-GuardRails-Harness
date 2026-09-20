@@ -9,6 +9,13 @@ from lgh.daemon import (
     laya_installed,
     start,
 )
+from lgh.daemon.server import resolve_device
+
+
+def test_resolve_device_aliases_gpu() -> None:
+    assert resolve_device("gpu") == "cuda"
+    assert resolve_device("CUDA") == "cuda"
+    assert resolve_device("cpu") == "cpu"
 
 
 def test_endpoint_from_url() -> None:

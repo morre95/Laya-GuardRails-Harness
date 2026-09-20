@@ -20,7 +20,11 @@ def main(argv: list[str] | None = None) -> int:
     daemon.add_argument("action", choices=["start", "stop", "status"])
     daemon.add_argument("--host", default=None, help="default: from laya.daemon_url in config")
     daemon.add_argument("--port", type=int, default=None, help="default: from laya.daemon_url in config")
-    daemon.add_argument("--device", default="cpu")
+    daemon.add_argument(
+        "--device",
+        default="cpu",
+        help="torch device (cpu, cuda). 'gpu' is an alias for cuda.",
+    )
 
     install = sub.add_parser("install-hooks", help="Install Claude Code hooks")
     target = install.add_mutually_exclusive_group()
