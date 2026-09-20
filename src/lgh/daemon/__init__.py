@@ -3,15 +3,18 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
+from urllib.parse import urlparse
 
-from lgh.paths import daemon_log_path, daemon_pid_path, user_state_dir
+from lgh.ids import utc_now_iso
+from lgh.paths import daemon_log_path, daemon_pid_path, user_config_path, user_state_dir
 
 LAYA_INSTALL_HINT = (
     "Laya is not installed in this environment.\n"
@@ -20,6 +23,13 @@ LAYA_INSTALL_HINT = (
     "  uv sync --extra dev --extra laya\n"
     "  USE_TF=0 uv run lgh daemon start"
 )
+
+LOG_START_MARKER = "=== lgh daemon start "
+
+
+def endpoint_from_url(url: str) -> tuple[str, int]:
+    parsed = urlparse(url)
+    return parsed.hostname or "127.0.0.1", parsed.port or 8765
 
 _HEALTH_ERRORS = (
     urllib.error.URLError,
@@ -59,11 +69,52 @@ def laya_installed() -> bool:
 
 
 def _log_tail(lines: int = 40) -> str:
+    """Tail of the daemon log, restricted to the most recent start."""
     path = daemon_log_path()
     if not path.is_file():
         return "(no daemon log yet)"
     text = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    for idx in range(len(text) - 1, -1, -1):
+        if text[idx].startswith(LOG_START_MARKER):
+            text = text[idx:]
+            break
     return "\n".join(text[-lines:]) or "(daemon log empty)"
+
+
+def _port_open(host: str, port: int, timeout: float = 0.3) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _port_owner(port: int) -> str:
+    ss = shutil.which("ss")
+    if ss is None:
+        return "(unknown; `ss` not available)"
+    try:
+        out = subprocess.run(
+            [ss, "-ltnp"], capture_output=True, text=True, timeout=2, check=False
+        ).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return "(unknown)"
+    for line in out.splitlines():
+        if f":{port} " in line or line.rstrip().endswith(f":{port}"):
+            return line.strip()
+    return "(unknown)"
+
+
+def _foreign_listener_error(host: str, port: int) -> "DaemonError":
+    return DaemonError(
+        f"Port {port} on {host} is already in use by a process that is not an LGH daemon.\n"
+        f"owner: {_port_owner(port)}\n"
+        "Either stop that process, or point LGH at a free port in "
+        f"{user_config_path()}:\n"
+        "  laya:\n"
+        f"    daemon_url: http://{host}:<free-port>\n"
+        "Then run `lgh daemon start` again (it reads the port from that config)."
+    )
 
 
 def _read_health(host: str, port: int, timeout: float = 1.0) -> dict | None:
@@ -91,15 +142,20 @@ def start(
     device: str = "cpu",
     timeout: float = 180.0,
 ) -> None:
-    if is_running() and (_read_health(host, port) or {}).get("ok"):
+    health = _read_health(host, port)
+    if is_running() and health and health.get("ok"):
         return
-    if is_running() and not (_read_health(host, port) or {}).get("ok"):
+    if is_running() and health is not None and not health.get("ok"):
         stop()
+    if health is None and _port_open(host, port):
+        raise _foreign_listener_error(host, port)
     if not laya_installed():
         raise DaemonError(LAYA_INSTALL_HINT)
     user_state_dir().mkdir(parents=True, exist_ok=True)
     log_path = daemon_log_path()
     log = log_path.open("a", encoding="utf-8")
+    log.write(f"{LOG_START_MARKER}{utc_now_iso()} host={host} port={port} ===\n")
+    log.flush()
     env = os.environ.copy()
     env["USE_TF"] = "0"
     proc = subprocess.Popen(

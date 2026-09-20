@@ -34,6 +34,10 @@ class ReviewConfig(MutableModel):
     frontier_enabled: bool = True
     timeout_seconds: float = 20.0
     model: str = "claude"
+    # Calling `claude -p` from inside a hook costs seconds. In shadow mode the
+    # result cannot change behaviour, so skip it by default and leave the
+    # policy decision as FRONTIER_REVIEW in the trace.
+    run_in_shadow: bool = False
 
 
 class HumanConfig(MutableModel):
@@ -90,8 +94,6 @@ class GuardrailConfig(MutableModel):
     )
     max_verification_cycles: int = 2
     max_replans_per_action: int = 2
-    daemon_host: str = "127.0.0.1"
-    daemon_port: int = 8765
     hook_timeout_seconds: int = 30
     extra_repo_rules: list[dict] = Field(default_factory=list)
     extra_user_rules: list[dict] = Field(default_factory=list)

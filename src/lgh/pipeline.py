@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from lgh.config.models import GuardrailConfig
 from lgh.frontier.base import map_frontier
+from lgh.frontier.claude_cli import ClaudeCliReviewer
 from lgh.frontier.stub import FrontierUnavailable, StubReviewer
 from lgh.human.prompt import human_prompt
 from lgh.laya.client import HttpLayaClient, LayaClient
@@ -77,9 +78,17 @@ class Pipeline:
             model=config.laya.model,
             temperatures=config.laya.temperatures,
         )
-        self.reviewer = reviewer if reviewer is not None else StubReviewer(unavailable=True)
+        if reviewer is not None:
+            self.reviewer = reviewer
+        elif config.review.frontier_enabled:
+            self.reviewer = ClaudeCliReviewer(timeout=config.review.timeout_seconds)
+        else:
+            self.reviewer = StubReviewer(unavailable=True)
         self.sessions = sessions or SessionStore()
         self.traces = traces or TraceWriter()
+
+    def _frontier_skipped(self) -> bool:
+        return self.config.mode == Mode.SHADOW and not self.config.review.run_in_shadow
 
     def evaluate(self, envelope: ActionEnvelope) -> EvaluationResult:
         error: str | None = None
@@ -111,9 +120,13 @@ class Pipeline:
                 policy = reduce_decision(rules, laya, self.config.laya.thresholds)
 
             decision = policy
+            frontier_skipped = False
             if decision == GuardrailDecision.FRONTIER_REVIEW:
                 if not self.config.review.frontier_enabled:
                     decision = GuardrailDecision.HUMAN_APPROVAL
+                elif self._frontier_skipped():
+                    frontier_skipped = True
+                    error = "frontier review skipped (shadow mode, review.run_in_shadow=false)"
                 else:
                     try:
                         request = ReviewRequest(
@@ -154,7 +167,11 @@ class Pipeline:
                 max_verification=self.config.max_verification_cycles,
                 max_replans=self.config.max_replans_per_action,
             )
-            if decision == GuardrailDecision.FRONTIER_REVIEW and frontier_resp is None:
+            if (
+                decision == GuardrailDecision.FRONTIER_REVIEW
+                and frontier_resp is None
+                and not frontier_skipped
+            ):
                 decision = GuardrailDecision.HUMAN_APPROVAL
 
             if decision == GuardrailDecision.ALLOW_WITH_VERIFICATION:

@@ -18,8 +18,8 @@ def main(argv: list[str] | None = None) -> int:
 
     daemon = sub.add_parser("daemon", help="Manage the local Laya daemon")
     daemon.add_argument("action", choices=["start", "stop", "status"])
-    daemon.add_argument("--host", default="127.0.0.1")
-    daemon.add_argument("--port", type=int, default=8765)
+    daemon.add_argument("--host", default=None, help="default: from laya.daemon_url in config")
+    daemon.add_argument("--port", type=int, default=None, help="default: from laya.daemon_url in config")
     daemon.add_argument("--device", default="cpu")
 
     install = sub.add_parser("install-hooks", help="Install Claude Code hooks")
@@ -86,19 +86,30 @@ def _hook(phase: str) -> int:
 
 def _daemon(args: argparse.Namespace) -> int:
     from lgh import daemon as daemon_mod
+    from lgh.config.loader import load_config
 
+    config = load_config(cwd=".")
+    cfg_host, cfg_port = daemon_mod.endpoint_from_url(config.laya.daemon_url)
+    host = args.host or cfg_host
+    port = args.port or cfg_port
+    if (host, port) != (cfg_host, cfg_port):
+        print(
+            f"warning: starting on {host}:{port} but hooks will call "
+            f"{config.laya.daemon_url}; set laya.daemon_url in config to match.",
+            file=sys.stderr,
+        )
     if args.action == "start":
         try:
-            daemon_mod.start(host=args.host, port=args.port, device=args.device)
+            daemon_mod.start(host=host, port=port, device=args.device)
         except daemon_mod.DaemonError as exc:
             print(str(exc), file=sys.stderr)
             return 1
-        print(daemon_mod.status_text(args.host, args.port))
+        print(daemon_mod.status_text(host, port))
         return 0
     if args.action == "stop":
         daemon_mod.stop()
         return 0
-    print(daemon_mod.status_text(args.host, args.port))
+    print(daemon_mod.status_text(host, port))
     return 0
 
 

@@ -30,6 +30,28 @@ def test_normalize_questions() -> None:
     assert a.latency_ms == 12
 
 
+def test_choice_confidence_is_top_probability_not_entropy() -> None:
+    """Laya reports entropy-based confidence on choice; we use P(top label)."""
+    answers = {
+        "task_alignment": {
+            "choice": "unclear",
+            "confidence": 0.005,
+            "probabilities": {"aligned": 0.24, "supporting": 0.25, "unclear": 0.26, "outside_scope": 0.25},
+        },
+        "destructive_risk": {"noul": 0.3},
+        "sensitive_resource": {"noul": 0.4},
+        "external_impact": {"noul": 0.5},
+        "reversibility": {"choice": "trivial", "confidence": 0.9, "probabilities": {"trivial": 0.97, "recoverable": 0.01, "difficult": 0.01, "irreversible": 0.01}},
+        "verification_needed": {"noul": 0.4},
+        "handling": {"choice": "escalate", "confidence": 0.0171},
+    }
+    a = normalize_assessment({"answers": answers}, model="m", latency_ms=1)
+    assert a.task_alignment.confidence == 0.26
+    assert a.reversibility.confidence == 0.97
+    # no probabilities -> fall back to Laya's own confidence field
+    assert a.handling.confidence == 0.0171
+
+
 def test_temperature_monotonic() -> None:
     assert apply_temperature(0.9, 2.0) < 0.9
 

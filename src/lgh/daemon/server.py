@@ -27,7 +27,7 @@ def load_agent(model: str = MODEL_ID, device: str = "cpu") -> Any:
     try:
         import laya  # type: ignore[import-untyped]
 
-        _AGENT = laya.load(model)
+        _AGENT = laya.load(model, device=device)
         _MODEL = model
         _LOADED_AT = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         _LOAD_ERROR = None

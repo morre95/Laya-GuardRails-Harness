@@ -61,6 +61,51 @@ def test_antiloop_escalates(tmp_path) -> None:
     assert d in {GuardrailDecision.FRONTIER_REVIEW, GuardrailDecision.HUMAN_APPROVAL}
 
 
+def test_shadow_skips_frontier_and_keeps_policy_decision(tmp_path) -> None:
+    cfg = GuardrailConfig(mode=Mode.SHADOW)
+    reviewer = StubReviewer(unavailable=True)
+    pipe = Pipeline(
+        cfg,
+        laya=FakeLayaClient(_assess(h="escalate", c=0.95)),
+        reviewer=reviewer,
+        sessions=SessionStore(tmp_path / "s"),
+        traces=TraceWriter(tmp_path / "t"),
+    )
+    result = pipe.evaluate(make_envelope(command="echo hi"))
+    assert result.policy_decision == GuardrailDecision.FRONTIER_REVIEW
+    assert result.decision == GuardrailDecision.FRONTIER_REVIEW
+    assert reviewer.calls == []
+    assert "skipped" in (result.error or "")
+
+
+def test_shadow_runs_frontier_when_opted_in(tmp_path) -> None:
+    cfg = GuardrailConfig(mode=Mode.SHADOW)
+    cfg.review.run_in_shadow = True
+    reviewer = StubReviewer(unavailable=True)
+    pipe = Pipeline(
+        cfg,
+        laya=FakeLayaClient(_assess(h="escalate", c=0.95)),
+        reviewer=reviewer,
+        sessions=SessionStore(tmp_path / "s"),
+        traces=TraceWriter(tmp_path / "t"),
+    )
+    result = pipe.evaluate(make_envelope(command="echo hi"))
+    assert len(reviewer.calls) == 1
+    assert result.decision == GuardrailDecision.HUMAN_APPROVAL
+
+
+def test_default_reviewer_is_claude_cli_when_frontier_enabled(tmp_path) -> None:
+    from lgh.frontier.claude_cli import ClaudeCliReviewer
+
+    pipe = Pipeline(
+        GuardrailConfig(),
+        laya=FakeLayaClient(_assess()),
+        sessions=SessionStore(tmp_path / "s"),
+        traces=TraceWriter(tmp_path / "t"),
+    )
+    assert isinstance(pipe.reviewer, ClaudeCliReviewer)
+
+
 def test_laya_down_enforce_goes_frontier(tmp_path) -> None:
     cfg = GuardrailConfig(mode=Mode.ENFORCE)
     pipe = Pipeline(

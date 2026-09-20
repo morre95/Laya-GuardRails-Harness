@@ -35,12 +35,25 @@ def apply_temperature(probability: float, temperature: float) -> float:
 
 
 def _choice(answers: dict[str, Any], key: str) -> tuple[str, float]:
+    """Return (label, confidence) where confidence is the top-class probability.
+
+    Laya's own ``confidence`` on ``choice`` questions is a normalized-entropy
+    score (1 - H(p)/log k), which is not what the reducer thresholds and the
+    ECE/Brier calibration in the spec assume. When per-option ``probabilities``
+    are present we take the probability of the chosen label; the entropy score
+    is only used as a fallback when the distribution is missing.
+    """
     payload = answers.get(key) or {}
     value = payload.get("choice") or payload.get("value")
-    confidence = payload.get("confidence", 0.0)
     if value is None:
         raise LayaUnavailable(f"missing choice for {key}")
-    return str(value), _clip(float(confidence))
+    probs = payload.get("probabilities")
+    if isinstance(probs, dict) and probs:
+        top = probs.get(str(value))
+        if top is None:
+            top = max(float(v) for v in probs.values())
+        return str(value), _clip(float(top))
+    return str(value), _clip(float(payload.get("confidence", 0.0)))
 
 
 def _noul(answers: dict[str, Any], key: str) -> float:

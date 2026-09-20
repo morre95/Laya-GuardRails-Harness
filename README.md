@@ -63,7 +63,7 @@ uv run lgh daemon stop
 
 Cold start downloads `convaiinnovations/laya-typed-decisions` on first run and can take a minute on CPU. Hooks still work in shadow mode if the daemon is down.
 
-Binds `127.0.0.1:8765` with `POST /predict`, `GET /health`, `POST /tokens`.
+Binds `127.0.0.1:8765` by default with `POST /predict`, `GET /health`, `POST /tokens`. The address comes from `laya.daemon_url` in `~/.config/lgh/config.yaml`, so hooks and daemon always agree. If another process already owns the port, `lgh daemon start` names it and refuses to start; change `daemon_url` to a free port or stop that process.
 
 Optional systemd user unit:
 
@@ -116,6 +116,10 @@ Repo config lives in `.guardrail/config.yaml` and `.guardrail/rules.yaml`. **Rep
 `ALLOW` · `ALLOW_WITH_VERIFICATION` · `REPLAN` · `FRONTIER_REVIEW` · `HUMAN_APPROVAL` · `BLOCK`
 
 Human approval is **approve this exact action once**. There is no "always allow" for risky operations.
+
+**Confidence semantics.** Laya's own `confidence` on `choice` questions is a normalized-entropy score (`1 - H(p)/log k`), not a probability. LGH stores `confidence` as the probability of the chosen label (from Laya's `probabilities`), which is what the reducer thresholds and the ECE/Brier calibration assume. Expect low values from the stock `laya-typed-decisions` checkpoint on coding-agent actions until domain calibration/fine-tuning; low confidence escalates, never allows.
+
+**Frontier review in shadow mode** is skipped by default (`review.run_in_shadow: false`) because it cannot change behaviour there and `claude -p` costs seconds per hook. The trace keeps `policyDecision: FRONTIER_REVIEW` so the escalation rate is still measurable.
 
 `ALLOW_WITH_VERIFICATION` routes to a skill (`database-safety`, `dependency-review`, `security-review`, `plan-first`, `deployment-safety`, `generic-verification`). Completing the skill does not auto-approve; the action is re-evaluated.
 
