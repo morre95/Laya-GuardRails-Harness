@@ -48,7 +48,11 @@ CLI:
 uv run lgh --help
 ```
 
-Or `uv tool install .`
+Or install the CLI on `PATH` (needed for Claude Code hooks and a systemd unit). Include the Laya extra or the tool env will not be able to load the model:
+
+```bash
+uv tool install ".[laya]"
+```
 
 ## Run the Laya daemon
 
@@ -65,15 +69,66 @@ Cold start downloads `convaiinnovations/laya-typed-decisions` on first run and c
 
 Binds `127.0.0.1:8765` by default with `POST /predict`, `GET /health`, `POST /tokens`. The address comes from `laya.daemon_url` in `~/.config/lgh/config.yaml`, so hooks and daemon always agree. If another process already owns the port, `lgh daemon start` names it and refuses to start; change `daemon_url` to a free port or stop that process.
 
-Optional systemd user unit:
+If the daemon is down: shadow mode logs the failure and does not interfere; enforce mode escalates semantic cases to frontier review (then human if the reviewer is unavailable). Known-safe hard rules still `ALLOW`; known-dangerous hard rules still `BLOCK`/`HUMAN`.
 
-```ini
-[Service]
-ExecStart=/usr/bin/env lgh daemon start
-Environment=USE_TF=0
+### Keep the daemon running with systemd
+
+`lgh daemon start` is a launcher: it forks `python -m lgh.daemon`, waits until `/health` is ok, then **exits**. Do not use it as `ExecStart` with `Type=simple` — systemd will think the service died. Run the HTTP server in the foreground instead.
+
+1. Install the CLI into a stable tool env (see above): `uv tool install ".[laya]"`.
+2. Confirm the interpreter that has `laya` / torch:
+
+```bash
+uv tool dir
+# typically ~/.local/share/uv/tools
+ls "$(uv tool dir)/lgh/bin/python"
 ```
 
-If the daemon is down: shadow mode logs the failure and does not interfere; enforce mode escalates semantic cases to frontier review (then human if the reviewer is unavailable). Known-safe hard rules still `ALLOW`; known-dangerous hard rules still `BLOCK`/`HUMAN`.
+3. Put the port in `~/.config/lgh/config.yaml` (`laya.daemon_url`) and use the **same** host/port in the unit. Default is `8765`. If that port is already taken, pick a free one (for example `8791`) and set `daemon_url` to match.
+4. Write `~/.config/systemd/user/lgh-daemon.service`:
+
+```ini
+[Unit]
+Description=LGH Laya daemon (localhost typed-decisions)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Foreground server. Do not ExecStart `lgh daemon start` (it forks and exits).
+ExecStart=%h/.local/share/uv/tools/lgh/bin/python -m lgh.daemon --host 127.0.0.1 --port 8765 --device cpu
+Environment=USE_TF=0
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=10
+# First start downloads the checkpoint; CPU load can take a minute.
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target
+```
+
+Adjust `ExecStart` if `uv tool dir` is not `~/.local/share/uv/tools`, change `--port` to match `daemon_url`, and use `--device gpu` when you have CUDA.
+
+Without `uv tool install`, point `ExecStart` at this clone's `.venv/bin/python -m lgh.daemon ...`. That unit breaks if you move or delete the clone.
+
+5. Enable and start:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now lgh-daemon.service
+systemctl --user status lgh-daemon.service
+curl -sS http://127.0.0.1:8765/health
+journalctl --user -u lgh-daemon.service -f
+```
+
+User units stop at logout unless lingering is on. For boot without a graphical session:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+The daemon only serves `/predict`. Traces are written when Claude Code hooks run (`lgh install-hooks --user` for every project). Shadow mode plus a resident daemon means those traces include a Laya assessment instead of `Connection refused`. That is still a **decision log**, not a labelled fine-tune set — use `lgh label` / `lgh export-dataset` for gold labels, and never train on Laya's own predictions.
 
 ## Claude Code hooks
 
