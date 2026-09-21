@@ -143,25 +143,23 @@ User units stop at logout unless lingering is on. For boot without a graphical s
 loginctl enable-linger "$USER"
 ```
 
-The daemon only serves `/predict`. It does **not** attach LGH to a coding agent. For traces you still have to install Claude Code hooks (next section). Shadow mode plus a resident daemon means those traces include a Laya assessment instead of `Connection refused`. That is still a **decision log**, not a labelled fine-tune set — use `lgh label` / `lgh export-dataset` for gold labels, and never train on Laya's own predictions.
+The daemon does **not** attach LGH to a coding agent. You have to have to install it manually. Right now only Claude Code hooks are supported (next section). If shadow mode is on, it means the traces is only a Laya assessment that can be used as training data when it is normolized.
 
 ## Claude Code hooks
 
-A running daemon is not enough. Claude Code only calls LGH after hooks are registered. **The first time you work in a repo**, `cd` into that repo and run:
+A running daemon is not enough. Claude Code only calls LGH after hooks are registered. **The first time you work in a repo**, `cd` into that repo and run this command to install it in the **project**:
 
 ```bash
-lgh install-hooks --project
+lgh install-hooks --project  # .claude/settings.json
 ```
 
-That writes `./.claude/settings.json` with `PreToolUse` / `PostToolUse` / `Stop` → `lgh hook pre|post|stop`. Do this once per repo (idempotent; writes a `.lgh.bak` backup). Use the `lgh` on `PATH` from `uv tool install`, **inside the target repo** — `uv run lgh` from the LGH clone does not install hooks into the other project, and the other project's `uv run` usually cannot see `lgh`.
+That writes `./.claude/settings.json` with `PreToolUse` / `PostToolUse` / `Stop` → `lgh hook pre|post|stop`. Do this once per repo.
 
-To cover every Claude Code project with one command instead:
+To install it **glogaly** run this command instead:
 
 ```bash
 lgh install-hooks --user    # ~/.claude/settings.json
 ```
-
-`lgh` must stay on `PATH` when Claude Code starts; the hook command is literally `lgh hook pre`. Cursor does not read these files. Optional `.guardrail/` in the target repo only tightens policy.
 
 Watch traces:
 
