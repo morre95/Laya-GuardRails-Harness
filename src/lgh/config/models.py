@@ -40,6 +40,14 @@ class ReviewConfig(MutableModel):
     run_in_shadow: bool = False
 
 
+class TeacherConfig(MutableModel):
+    """Labeling teacher for `lgh review --propose`. User config only."""
+
+    provider: str = "openrouter"
+    model: str = ""
+    base_url: str = "https://openrouter.ai/api/v1"
+
+
 class HumanConfig(MutableModel):
     production_mutations: str = "always"
 
@@ -56,6 +64,7 @@ class GuardrailConfig(MutableModel):
     protected_branches: list[str] = Field(default_factory=lambda: ["main", "production"])
     laya: LayaConfig = Field(default_factory=LayaConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
+    teacher: TeacherConfig = Field(default_factory=TeacherConfig)
     human: HumanConfig = Field(default_factory=HumanConfig)
     delete_threshold: int = 50
     require_tests: bool = False

@@ -221,6 +221,7 @@ Label traces and export a fine-tune dataset (never train on Laya's own predictio
 
 ```bash
 uv run lgh review                 # http://127.0.0.1:8770  (Ctrl-C to stop)
+uv run lgh review --propose --teacher llm   # OpenRouter prefills the form
 uv run lgh label TRACE_ID --source human --handling replan \
   --task-alignment outside_scope --reversibility recoverable \
   --destructive-risk 0.2 --sensitive-resource 0 --external-impact 0.1 \
@@ -231,9 +232,20 @@ uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
 
 `lgh review` is a localhost labeling desk. It shows the stored `LayaState` and the seven questions. Completing a label writes `~/.local/share/lgh/labels.jsonl`. Traces collected **before** this change have no state and cannot be labeled; new hook events can.
 
+`--propose` asks a teacher LLM to prefill the seven answers for the open unlabeled trace. `--teacher llm` is the only teacher in this version; `--propose` alone defaults to it. Suggestions fill the form and are **not** saved until you click Save (the stored label is still `source: human`). Set the model in **user** config (`~/.config/lgh/config.yaml`); a repo cannot retarget it:
+
+```yaml
+teacher:
+  provider: openrouter
+  model: x-ai/grok-4
+  base_url: https://openrouter.ai/api/v1
+```
+
+The API key is `OPENROUTER_API_KEY` in the environment, never in yaml. Missing model or key aborts before the UI listens.
+
 ## Privacy
 
-Traces never store secret values, API keys, tokens, `.env` contents, private keys, authorization headers, full source files, or raw credentials. Sensitive targets are logged as metadata with `contentsLogged: false`. New traces also store a compact **redacted** `LayaState` (goal, plan, command, repo metadata) so a human can label the action later. That snapshot is the training input.
+Traces never store secret values, API keys, tokens, `.env` contents, private keys, authorization headers, full source files, or raw credentials. Sensitive targets are logged as metadata with `contentsLogged: false`. New traces also store a compact **redacted** `LayaState` (goal, plan, command, repo metadata) so a human can label the action later. That snapshot is the training input. `lgh review --propose` sends that redacted snapshot to OpenRouter; the API key stays in `OPENROUTER_API_KEY`.
 
 ## v0.1 non-goals
 

@@ -44,6 +44,9 @@ def merge_configs(user: GuardrailConfig, repo: GuardrailConfig) -> GuardrailConf
         merged.laya.model = repo.laya.model
     merged.laya.temperatures = {**repo.laya.temperatures, **user.laya.temperatures}
     merged.review.frontier_enabled = user.review.frontier_enabled or repo.review.frontier_enabled
+    # Teacher credentials/model live on the user machine. A repo cannot retarget
+    # OpenRouter calls by setting teacher in .guardrail/config.yaml.
+    merged.teacher = user.teacher.model_copy(deep=True)
     if user.human.production_mutations == "always" or repo.human.production_mutations == "always":
         merged.human.production_mutations = "always"
     merged.delete_threshold = min(user.delete_threshold, repo.delete_threshold)

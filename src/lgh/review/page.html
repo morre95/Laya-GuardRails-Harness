@@ -137,6 +137,15 @@
       border-radius: 6px;
       margin-bottom: 16px;
     }
+    .proposal {
+      border: 1px solid #3a5a48;
+      background: #142018;
+      color: var(--mint);
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin: 0 0 16px;
+      min-height: 1.2em;
+    }
   </style>
 </head>
 <body>
@@ -157,6 +166,7 @@
     let filter = "unlabeled";
     let currentId = null;
     let form = null;
+    let proposeEnabled = false;
 
     const CHOICE = {
       task_alignment: ["aligned", "supporting", "unclear", "outside_scope"],
@@ -297,6 +307,7 @@
         </dl>
         <p class="hint">Do not copy Laya’s guess. Label what <em>you</em> would decide.</p>
         ${layaChip("handling", data.laya)}
+        ${proposeEnabled && data.status === "unlabeled" ? `<p class="proposal" id="proposal">Asking teacher…</p>` : `<p class="proposal" id="proposal" hidden></p>`}
         <form id="labelform">
           ${choiceField("task_alignment", q.task_alignment || {}, lab.task_alignment)}
           ${noulField("destructive_risk", q.destructive_risk || {}, lab.destructive_risk)}
@@ -368,11 +379,56 @@
       return null;
     }
 
+    function applyProposal(p) {
+      if (!form) return;
+      for (const key of Object.keys(CHOICE)) {
+        const input = form.querySelector(`input[name="${key}"][value="${p[key]}"]`);
+        if (input) input.checked = true;
+      }
+      for (const key of NOUL) {
+        const input = form.querySelector(`input[name="${key}"]`);
+        if (input && p[key] != null) {
+          input.value = p[key];
+          const out = input.parentElement.querySelector("output");
+          if (out) out.textContent = noulVal(p[key]);
+        }
+      }
+      const banner = $("proposal");
+      if (banner) {
+        banner.hidden = false;
+        banner.innerHTML = `<strong>${escapeHtml(p.model || "teacher")}</strong> suggested these values. Edit before you save.`
+          + (p.reason ? `<br>${escapeHtml(p.reason)}` : "");
+      }
+    }
+
+    async function fetchProposal(id) {
+      const err = $("err");
+      const banner = $("proposal");
+      try {
+        const proposal = await api("/api/propose", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trace_id: id }),
+        });
+        if (currentId !== id) return;
+        applyProposal(proposal);
+      } catch (e) {
+        if (banner) {
+          banner.hidden = false;
+          banner.textContent = "Teacher failed: " + e.message;
+        }
+        if (err) err.textContent = e.message;
+      }
+    }
+
     async function openTrace(id) {
       currentId = id;
       renderList();
       const data = await api("/api/traces/" + encodeURIComponent(id));
       renderDetail(data);
+      if (proposeEnabled && data.status === "unlabeled" && data.state) {
+        await fetchProposal(id);
+      }
     }
 
     async function reload(advance) {
@@ -403,7 +459,14 @@
       }
     });
 
-    reload(false).catch((e) => { $("main").innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`; });
+    api("/api/config").then((cfg) => {
+      proposeEnabled = Boolean(cfg.propose);
+      const brand = document.querySelector(".brand p");
+      if (brand && proposeEnabled) {
+        brand.textContent = "Teacher prefills unlabeled traces. Save still writes a human label.";
+      }
+      return reload(false);
+    }).catch((e) => { $("main").innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`; });
   </script>
 </body>
 </html>

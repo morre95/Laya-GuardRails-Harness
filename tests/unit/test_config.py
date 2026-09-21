@@ -28,3 +28,12 @@ def test_protected_union() -> None:
     merged = merge_configs(user, repo)
     assert "main" in merged.protected_branches
     assert "release" in merged.protected_branches
+
+
+def test_repo_cannot_override_teacher_model() -> None:
+    user = GuardrailConfig()
+    user.teacher.model = "x-ai/grok-4"
+    repo = GuardrailConfig()
+    repo.teacher.model = "openai/gpt-5"
+    merged = merge_configs(user, repo)
+    assert merged.teacher.model == "x-ai/grok-4"

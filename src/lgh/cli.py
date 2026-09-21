@@ -66,6 +66,17 @@ def main(argv: list[str] | None = None) -> int:
     review.add_argument("--host", default="127.0.0.1")
     review.add_argument("--port", type=int, default=8770)
     review.add_argument("--no-browser", action="store_true")
+    review.add_argument(
+        "--propose",
+        action="store_true",
+        help="Ask a teacher LLM to prefill labels (not saved until you confirm)",
+    )
+    review.add_argument(
+        "--teacher",
+        default=None,
+        metavar="KIND",
+        help="Teacher when --propose is set (default: llm). Only 'llm' is supported.",
+    )
 
     tail = sub.add_parser("trace", help="Inspect traces")
     tail.add_argument("action", choices=["tail", "watch"])
@@ -204,9 +215,20 @@ def _label(args: argparse.Namespace) -> int:
 
 def _review(args: argparse.Namespace) -> int:
     from lgh.review.server import serve
+    from lgh.teacher import TeacherError, resolve_teacher
 
     try:
-        serve(host=args.host, port=args.port, open_browser=not args.no_browser)
+        teacher = resolve_teacher(args.propose, args.teacher)
+    except TeacherError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    try:
+        serve(
+            host=args.host,
+            port=args.port,
+            open_browser=not args.no_browser,
+            teacher=teacher,
+        )
     except OSError as exc:
         print(str(exc), file=sys.stderr)
         return 1

@@ -13,6 +13,7 @@ from lgh.review.queue import ReviewStore, unique_traces
 from lgh.review.server import make_handler
 from lgh.schema.trace import DecisionTrace
 from lgh.session.store import SessionStore
+from lgh.teacher import TeacherError
 from lgh.trace.writer import TraceWriter
 from tests.helpers import make_envelope
 from tests.unit.test_pipeline import _assess
@@ -27,6 +28,32 @@ def _pipe(tmp_path, command: str = "echo hi", goal: str = "say hello"):
         sessions=SessionStore(tmp_path / "s"),
         traces=TraceWriter(tmp_path / "t"),
     ), make_envelope(command=command, goal=goal)
+
+
+class FakeTeacher:
+    kind = "llm"
+    provider = "openrouter"
+    model = "x-ai/grok-4"
+
+    def __init__(self, *, invalid: bool = False) -> None:
+        self.invalid = invalid
+        self.calls: list[dict] = []
+
+    def propose(self, state: dict, questions: dict | None = None) -> dict:
+        self.calls.append(state)
+        if self.invalid:
+            raise TeacherError("teacher returned an invalid label: handling must be one of")
+        return {
+            "model": self.model,
+            "reason": "push leaves the machine",
+            "task_alignment": "aligned",
+            "destructive_risk": 0.2,
+            "sensitive_resource": 0.0,
+            "external_impact": 0.8,
+            "reversibility": "recoverable",
+            "verification_needed": 0.7,
+            "handling": "verify",
+        }
 
 
 def test_unique_traces_keeps_last() -> None:
@@ -106,6 +133,8 @@ def test_review_http_roundtrip(tmp_path) -> None:
     try:
         port = httpd.server_address[1]
         base = f"http://127.0.0.1:{port}"
+        cfg = json.loads(urlopen(base + "/api/config", timeout=2).read())
+        assert cfg["propose"] is False
         queue = json.loads(urlopen(base + "/api/queue", timeout=2).read())
         assert queue["counts"]["unlabeled"] == 1
         page = urlopen(base + "/", timeout=2).read().decode("utf-8")
@@ -130,5 +159,56 @@ def test_review_http_roundtrip(tmp_path) -> None:
         queue = json.loads(urlopen(base + "/api/queue", timeout=2).read())
         assert queue["counts"]["labeled"] == 1
         assert queue["counts"]["unlabeled"] == 0
+        propose = Request(
+            base + "/api/propose",
+            data=json.dumps({"trace_id": result.trace.trace_id}).encode(),
+            method="POST",
+        )
+        propose.add_header("Content-Type", "application/json")
+        from urllib.error import HTTPError
+
+        with pytest.raises(HTTPError) as disabled:
+            urlopen(propose, timeout=2)
+        assert disabled.value.code == 400
+    finally:
+        httpd.shutdown()
+
+
+def test_review_http_propose(tmp_path) -> None:
+    from http.server import ThreadingHTTPServer
+    from urllib.error import HTTPError
+
+    pipe, env = _pipe(tmp_path, command="git push origin HEAD")
+    result = pipe.evaluate(env)
+    store = ReviewStore(traces_dir=tmp_path / "t", data_dir=tmp_path)
+    teacher = FakeTeacher()
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(store, teacher=teacher))
+    thread = Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = httpd.server_address[1]
+        base = f"http://127.0.0.1:{port}"
+        cfg = json.loads(urlopen(base + "/api/config", timeout=2).read())
+        assert cfg["propose"] is True
+        assert cfg["model"] == "x-ai/grok-4"
+        req = Request(
+            base + "/api/propose",
+            data=json.dumps({"trace_id": result.trace.trace_id}).encode(),
+            method="POST",
+        )
+        req.add_header("Content-Type", "application/json")
+        proposed = json.loads(urlopen(req, timeout=2).read())
+        assert proposed["handling"] == "verify"
+        assert proposed["reason"] == "push leaves the machine"
+        assert teacher.calls and teacher.calls[0]["action"]["command"] == "git push origin HEAD"
+        missing = Request(
+            base + "/api/propose",
+            data=json.dumps({"trace_id": "missing"}).encode(),
+            method="POST",
+        )
+        missing.add_header("Content-Type", "application/json")
+        with pytest.raises(HTTPError) as exc:
+            urlopen(missing, timeout=2)
+        assert exc.value.code == 404
     finally:
         httpd.shutdown()
