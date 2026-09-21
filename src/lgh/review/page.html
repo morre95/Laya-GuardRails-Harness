@@ -45,6 +45,17 @@
     .brand { padding: 18px 16px 10px; }
     .brand h1 { margin: 0; font-size: 18px; letter-spacing: 0.04em; }
     .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 0;
+      color: var(--ink);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .toggle[hidden] { display: none; }
+    .toggle input { accent-color: var(--mint); }
     .counts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 16px 12px; }
     .counts button {
       background: var(--paper);
@@ -153,7 +164,11 @@
     <aside>
       <div class="brand">
         <h1>LGH review</h1>
-        <p>Human labels for Laya. Model guesses are hints only.</p>
+        <p id="brand-copy">Human labels for Laya. Model guesses are hints only.</p>
+        <label class="toggle" id="teacher-toggle" hidden>
+          <input type="checkbox" id="teacher-on" checked>
+          Ask LLM
+        </label>
       </div>
       <div class="counts" id="counts"></div>
       <div class="list" id="list"></div>
@@ -166,6 +181,7 @@
     let filter = "unlabeled";
     let currentId = null;
     let form = null;
+    let teacherAvailable = false;
     let proposeEnabled = false;
 
     const CHOICE = {
@@ -447,8 +463,33 @@
       else $("main").innerHTML = `<p class="empty">No traces in ${filter}. New actions appear here after the daemon+hooks run.</p>`;
     }
 
+    function hideProposal() {
+      const banner = $("proposal");
+      if (banner) {
+        banner.hidden = true;
+        banner.textContent = "";
+      }
+    }
+
+    async function setProposeEnabled(on) {
+      proposeEnabled = Boolean(on);
+      if (!proposeEnabled) {
+        hideProposal();
+        return;
+      }
+      const item = items.find((it) => it.traceId === currentId);
+      if (item && item.status === "unlabeled" && item.hasState) {
+        const banner = $("proposal");
+        if (banner) {
+          banner.hidden = false;
+          banner.textContent = "Asking teacher…";
+        }
+        await fetchProposal(currentId);
+      }
+    }
+
     document.addEventListener("keydown", (e) => {
-      if (e.target.matches("input[type=text], textarea")) return;
+      if (e.target.matches("input, textarea, button")) return;
       if (e.key === "s" && !e.metaKey && !e.ctrlKey) { e.preventDefault(); skipCurrent(); }
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && form) { e.preventDefault(); saveCurrent(); }
       if (e.key === "j" || e.key === "k") {
@@ -460,10 +501,18 @@
     });
 
     api("/api/config").then((cfg) => {
-      proposeEnabled = Boolean(cfg.propose);
-      const brand = document.querySelector(".brand p");
-      if (brand && proposeEnabled) {
-        brand.textContent = "Teacher prefills unlabeled traces. Save still writes a human label.";
+      teacherAvailable = Boolean(cfg.propose);
+      proposeEnabled = teacherAvailable;
+      const toggle = $("teacher-toggle");
+      const box = $("teacher-on");
+      const brand = $("brand-copy");
+      if (teacherAvailable && toggle && box) {
+        toggle.hidden = false;
+        box.checked = true;
+        box.addEventListener("change", () => { setProposeEnabled(box.checked); });
+        if (brand) {
+          brand.textContent = "Uncheck Ask LLM to label without a teacher. Save still writes a human label.";
+        }
       }
       return reload(false);
     }).catch((e) => { $("main").innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`; });

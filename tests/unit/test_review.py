@@ -139,6 +139,8 @@ def test_review_http_roundtrip(tmp_path) -> None:
         assert queue["counts"]["unlabeled"] == 1
         page = urlopen(base + "/", timeout=2).read().decode("utf-8")
         assert "LGH review" in page
+        assert 'id="teacher-on"' in page
+        assert 'id="teacher-toggle"' in page
         body = json.dumps(
             {
                 "trace_id": result.trace.trace_id,
