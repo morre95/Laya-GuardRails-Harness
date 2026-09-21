@@ -39,6 +39,9 @@ def test_shadow_never_blocks_trace_still_records(tmp_path) -> None:
     assert result.decision == GuardrailDecision.BLOCK
     assert result.mode == Mode.SHADOW
     assert result.trace.final_decision == GuardrailDecision.BLOCK
+    assert result.trace.state is not None
+    assert result.trace.state.action.command == "rm -rf /"
+    assert result.trace.state.goal == "Do a thing"
 
 
 def test_human_prompt_is_concrete() -> None:

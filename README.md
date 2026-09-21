@@ -220,15 +220,21 @@ uv run lgh eval
 Label traces and export a fine-tune dataset (never train on Laya's own predictions):
 
 ```bash
-uv run lgh label TRACE_ID --handling replan --source human
+uv run lgh review                 # http://127.0.0.1:8770  (Ctrl-C to stop)
+uv run lgh label TRACE_ID --source human --handling replan \
+  --task-alignment outside_scope --reversibility recoverable \
+  --destructive-risk 0.2 --sensitive-resource 0 --external-impact 0.1 \
+  --verification-needed 0.8
 uv run lgh calibrate
 uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
 ```
 
+`lgh review` is a localhost labeling desk. It shows the stored `LayaState` and the seven questions. Completing a label writes `~/.local/share/lgh/labels.jsonl`. Traces collected **before** this change have no state and cannot be labeled; new hook events can.
+
 ## Privacy
 
-Traces never store secret values, API keys, tokens, `.env` contents, private keys, authorization headers, full source files, or raw credentials. Sensitive targets are logged as metadata with `contentsLogged: false`.
+Traces never store secret values, API keys, tokens, `.env` contents, private keys, authorization headers, full source files, or raw credentials. Sensitive targets are logged as metadata with `contentsLogged: false`. New traces also store a compact **redacted** `LayaState` (goal, plan, command, repo metadata) so a human can label the action later. That snapshot is the training input.
 
 ## v0.1 non-goals
 
-No custom Laya checkpoint, no autonomous policy learning, no Codex parity, no GUI, no cloud service, no automatic threshold optimization.
+No custom Laya checkpoint, no autonomous policy learning, no Codex parity, no desktop/cloud console, no cloud service, no automatic threshold optimization.

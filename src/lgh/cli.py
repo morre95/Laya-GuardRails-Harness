@@ -41,14 +41,31 @@ def main(argv: list[str] | None = None) -> int:
 
     lab = sub.add_parser("label", help="Label a trace for the dataset")
     lab.add_argument("trace_id")
-    lab.add_argument("--handling", required=True)
     lab.add_argument("--source", choices=["human", "frontier", "deterministic"], required=True)
-    lab.add_argument("--task-alignment", dest="task_alignment", default=None)
-    lab.add_argument("--destructive-risk", dest="destructive_risk", action="store_true")
-    lab.add_argument("--verification-needed", dest="verification_needed", action="store_true")
+    lab.add_argument("--handling", required=True, choices=["allow", "verify", "replan", "escalate"])
+    lab.add_argument(
+        "--task-alignment",
+        dest="task_alignment",
+        required=True,
+        choices=["aligned", "supporting", "unclear", "outside_scope"],
+    )
+    lab.add_argument(
+        "--reversibility",
+        required=True,
+        choices=["trivial", "recoverable", "difficult", "irreversible"],
+    )
+    lab.add_argument("--destructive-risk", dest="destructive_risk", type=float, required=True)
+    lab.add_argument("--sensitive-resource", dest="sensitive_resource", type=float, required=True)
+    lab.add_argument("--external-impact", dest="external_impact", type=float, required=True)
+    lab.add_argument("--verification-needed", dest="verification_needed", type=float, required=True)
 
     export = sub.add_parser("export-dataset", help="Export labeled traces")
     export.add_argument("--output", type=Path, required=True)
+
+    review = sub.add_parser("review", help="Open a local UI for labeling traces")
+    review.add_argument("--host", default="127.0.0.1")
+    review.add_argument("--port", type=int, default=8770)
+    review.add_argument("--no-browser", action="store_true")
 
     tail = sub.add_parser("trace", help="Inspect traces")
     tail.add_argument("action", choices=["tail", "watch"])
@@ -69,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
         return _label(args)
     if args.cmd == "export-dataset":
         return _export(args)
+    if args.cmd == "review":
+        return _review(args)
     if args.cmd == "trace":
         if args.action == "watch":
             return _trace_watch(args.n)
@@ -161,18 +180,36 @@ def _calibrate(args: argparse.Namespace) -> int:
 
 
 def _label(args: argparse.Namespace) -> int:
-    from lgh.eval.labels import append_label
+    from lgh.eval.labels import LabelError, append_label
 
-    append_label(
-        {
-            "trace_id": args.trace_id,
-            "handling": args.handling,
-            "source": args.source,
-            "task_alignment": args.task_alignment,
-            "destructive_risk": args.destructive_risk,
-            "verification_needed": args.verification_needed,
-        }
-    )
+    try:
+        append_label(
+            {
+                "trace_id": args.trace_id,
+                "source": args.source,
+                "handling": args.handling,
+                "task_alignment": args.task_alignment,
+                "reversibility": args.reversibility,
+                "destructive_risk": args.destructive_risk,
+                "sensitive_resource": args.sensitive_resource,
+                "external_impact": args.external_impact,
+                "verification_needed": args.verification_needed,
+            }
+        )
+    except LabelError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
+
+
+def _review(args: argparse.Namespace) -> int:
+    from lgh.review.server import serve
+
+    try:
+        serve(host=args.host, port=args.port, open_browser=not args.no_browser)
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     return 0
 
 

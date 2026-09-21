@@ -49,6 +49,18 @@ def _scale(p: float, t: float) -> float:
     return 1 / (1 + math.exp(-logit / t))
 
 
+def _noul_target(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return min(1.0, max(0.0, number))
+
+
 def calibrate_from_traces(traces: list[DecisionTrace], labels: list[dict]) -> dict:
     by_key: dict[str, tuple[list[float], list[int]]] = defaultdict(lambda: ([], []))
     labeled = {item["trace_id"]: item for item in labels}
@@ -57,19 +69,21 @@ def calibrate_from_traces(traces: list[DecisionTrace], labels: list[dict]) -> di
         if not lab or trace.laya is None:
             continue
         a = trace.laya.assessment
-        mapping = {
-            "noul_destructive": (a.destructive_risk, int(bool(lab.get("destructive_risk")))),
-            "noul_sensitive": (a.sensitive_resource, int(bool(lab.get("sensitive_resource")))),
-            "noul_external": (a.external_impact, int(bool(lab.get("external_impact")))),
-            "noul_verify": (a.verification_needed, int(bool(lab.get("verification_needed")))),
+        mapping: dict[str, tuple[float, float | int | None]] = {
+            "noul_destructive": (a.destructive_risk, _noul_target(lab.get("destructive_risk"))),
+            "noul_sensitive": (a.sensitive_resource, _noul_target(lab.get("sensitive_resource"))),
+            "noul_external": (a.external_impact, _noul_target(lab.get("external_impact"))),
+            "noul_verify": (a.verification_needed, _noul_target(lab.get("verification_needed"))),
             "choice_4_handling": (
                 a.handling.confidence,
                 int(a.handling.value == lab.get("handling")),
             ),
         }
         for key, (prob, y) in mapping.items():
+            if y is None:
+                continue
             by_key[key][0].append(prob)
-            by_key[key][1].append(y)
+            by_key[key][1].append(int(y >= 0.5) if key.startswith("noul_") else int(y))
     report = {}
     temperatures: dict[str, float] = {}
     for key, (probs, ys) in by_key.items():

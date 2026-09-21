@@ -12,7 +12,7 @@ from lgh.laya.normalize import LayaUnavailable
 from lgh.policy.reducer import reduce_decision
 from lgh.rules.engine import evaluate_rules, is_known_safe, matched_categories
 from lgh.schema.decision import GuardrailDecision, Mode
-from lgh.schema.envelope import ActionEnvelope
+from lgh.schema.envelope import ActionEnvelope, LayaState
 from lgh.schema.frontier import ReviewRequest, ReviewResponse
 from lgh.schema.laya import LayaAssessment
 from lgh.schema.rules import RuleDisposition, RuleResult
@@ -101,12 +101,13 @@ class Pipeline:
         policy = GuardrailDecision.ALLOW
         decision = GuardrailDecision.ALLOW
         rules = RuleResult(matched=[], disposition=RuleDisposition.PASS)
+        state: LayaState | None = None
         try:
             envelope = apply_environment(envelope, self.config)
+            state = build_laya_state(envelope, self.config)
             rules = evaluate_rules(envelope, self.config)
             if rules.disposition == RuleDisposition.PASS:
                 try:
-                    state = build_laya_state(envelope, self.config)
                     laya = self.laya.assess(state)
                 except LayaUnavailable as exc:
                     laya_error = str(exc)
@@ -203,6 +204,7 @@ class Pipeline:
             human=human,
             verification_skill=verification.skill if verification else None,
             error=error,
+            state=state,
         )
         return EvaluationResult(
             envelope=envelope,

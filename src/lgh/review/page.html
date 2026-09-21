@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LGH review</title>
+  <style>
+    :root {
+      --bg: #14110e;
+      --bg-2: #1c1813;
+      --ink: #f3ead7;
+      --muted: #9a8d78;
+      --line: #3a3228;
+      --paper: #221c16;
+      --amber: #e0a45a;
+      --mint: #8fbf9a;
+      --rose: #d9786a;
+      --sky: #7ea6c4;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font: 14px/1.45 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    code, .mono, kbd {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    kbd {
+      border: 1px solid var(--line);
+      padding: 0 5px;
+      border-radius: 3px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    #app { display: grid; grid-template-columns: 300px 1fr; height: 100%; }
+    aside {
+      border-right: 1px solid var(--line);
+      background: var(--bg-2);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .brand { padding: 18px 16px 10px; }
+    .brand h1 { margin: 0; font-size: 18px; letter-spacing: 0.04em; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .counts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 16px 12px; }
+    .counts button {
+      background: var(--paper);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .counts button.on { border-color: var(--amber); color: var(--amber); }
+    .counts strong { display: block; font-size: 16px; }
+    .list { overflow: auto; flex: 1; border-top: 1px solid var(--line); }
+    .item {
+      display: block; width: 100%; text-align: left;
+      background: transparent; color: inherit;
+      border: 0; border-bottom: 1px solid var(--line);
+      padding: 10px 14px; cursor: pointer;
+    }
+    .item:hover { background: #2a231c; }
+    .item.on { background: #2f261c; box-shadow: inset 3px 0 0 var(--amber); }
+    .item .sum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item .meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    main { overflow: auto; padding: 22px 28px 96px; }
+    .empty { color: var(--muted); max-width: 36em; }
+    .goal { font-size: 22px; margin: 0 0 8px; }
+    .cmd {
+      background: #0e0c0a;
+      border: 1px solid var(--line);
+      padding: 12px 14px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 12px 0 16px;
+    }
+    .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .chip {
+      border: 1px solid var(--line);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .chip.laya { color: var(--sky); }
+    dl.kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 14px; margin: 0 0 22px; }
+    dl.kv dt { color: var(--muted); }
+    dl.kv dd { margin: 0; }
+    fieldset {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 12px;
+      padding: 12px 14px;
+      background: var(--paper);
+    }
+    legend { color: var(--amber); padding: 0 6px; }
+    .hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg label {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .seg input { display: none; }
+    .seg input:checked + span { color: var(--bg); }
+    .seg label:has(input:checked) { background: var(--amber); border-color: var(--amber); color: var(--bg); }
+    .noul { display: grid; grid-template-columns: 1fr 52px; gap: 10px; align-items: center; }
+    input[type=range] { width: 100%; }
+    .noul output { font-variant-numeric: tabular-nums; }
+    footer.bar {
+      position: sticky; bottom: 0;
+      display: flex; gap: 10px; align-items: center;
+      padding-top: 16px; background: linear-gradient(transparent, var(--bg) 28%);
+    }
+    footer.bar button {
+      font: inherit;
+      padding: 9px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      cursor: pointer;
+    }
+    .save { background: var(--mint); color: #102016; border-color: var(--mint); }
+    .skip { background: transparent; color: var(--ink); }
+    .err { color: var(--rose); min-height: 1.2em; }
+    .warn {
+      border: 1px solid #6a4a28;
+      background: #2a1d10;
+      color: var(--amber);
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <div class="brand">
+        <h1>LGH review</h1>
+        <p>Human labels for Laya. Model guesses are hints only.</p>
+      </div>
+      <div class="counts" id="counts"></div>
+      <div class="list" id="list"></div>
+    </aside>
+    <main id="main"><p class="empty">Loading traces…</p></main>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let items = [];
+    let filter = "unlabeled";
+    let currentId = null;
+    let form = null;
+
+    const CHOICE = {
+      task_alignment: ["aligned", "supporting", "unclear", "outside_scope"],
+      reversibility: ["trivial", "recoverable", "difficult", "irreversible"],
+      handling: ["allow", "verify", "replan", "escalate"],
+    };
+    const NOUL = ["destructive_risk", "sensitive_resource", "external_impact", "verification_needed"];
+
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      return data;
+    }
+
+    function noulVal(v) {
+      if (v == null) return 0;
+      return Number(v).toFixed(2);
+    }
+
+    function renderCounts(counts) {
+      const keys = [
+        ["unlabeled", "Unlabeled"],
+        ["labeled", "Labeled"],
+        ["skipped", "Skipped"],
+        ["no_state", "No state"],
+      ];
+      $("counts").innerHTML = keys.map(([k, label]) =>
+        `<button data-f="${k}" class="${filter === k ? "on" : ""}"><strong>${counts[k] || 0}</strong>${label}</button>`
+      ).join("");
+      $("counts").onclick = (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        filter = b.dataset.f;
+        renderList();
+        renderCounts(counts);
+      };
+    }
+
+    function filtered() {
+      return items.filter((it) => it.status === filter);
+    }
+
+    function renderList() {
+      const rows = filtered();
+      $("list").innerHTML = rows.map((it) => `
+        <button class="item ${it.traceId === currentId ? "on" : ""}" data-id="${it.traceId}">
+          <div class="sum mono">${escapeHtml(it.summary)}</div>
+          <div class="meta mono">${it.decision} · ${it.timestamp.slice(0, 19)}</div>
+        </button>
+      `).join("") || `<p class="empty" style="padding:16px">Nothing in ${filter}.</p>`;
+      $("list").onclick = (e) => {
+        const b = e.target.closest(".item");
+        if (b) openTrace(b.dataset.id);
+      };
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+
+    function layaChip(q, assessment) {
+      if (!assessment) return "";
+      const map = {
+        task_alignment: assessment.taskAlignment,
+        reversibility: assessment.reversibility,
+        handling: assessment.handling,
+        destructive_risk: assessment.destructiveRisk,
+        sensitive_resource: assessment.sensitiveResource,
+        external_impact: assessment.externalImpact,
+        verification_needed: assessment.verificationNeeded,
+      };
+      const v = map[q];
+      if (v == null) return "";
+      if (typeof v === "object") {
+        return `<span class="chip laya">Laya ${escapeHtml(v.value)} ${Number(v.confidence).toFixed(2)}</span>`;
+      }
+      return `<span class="chip laya">Laya ${Number(v).toFixed(2)}</span>`;
+    }
+
+    function choiceField(key, spec, selected) {
+      const opts = CHOICE[key];
+      return `
+        <fieldset>
+          <legend>${key}</legend>
+          <p class="hint">${escapeHtml(spec.instructions || "")}</p>
+          <div class="seg">
+            ${opts.map((o) => `
+              <label><input type="radio" name="${key}" value="${o}" ${selected === o ? "checked" : ""}>
+              <span>${o}</span></label>
+            `).join("")}
+          </div>
+        </fieldset>`;
+    }
+
+    function noulField(key, spec, value) {
+          const v = value == null ? 0.5 : Number(value);
+      return `
+        <fieldset>
+          <legend>${key}</legend>
+          <p class="hint">${escapeHtml(spec.instructions || "")}</p>
+          <div class="noul">
+            <input type="range" name="${key}" min="0" max="1" step="0.05" value="${v}">
+            <output>${noulVal(v)}</output>
+          </div>
+        </fieldset>`;
+    }
+
+    function renderDetail(data) {
+      const q = data.questions || {};
+      const lab = data.label || {};
+      const state = data.state;
+      if (!state) {
+        $("main").innerHTML = `
+          <div class="warn">This trace has no stored LayaState. It was collected before the review UI. Skip it; only new hook events can be labeled.</div>
+          <p class="mono">${data.traceId}</p>
+          <footer class="bar"><button class="skip" id="skip">Skip</button></footer>`;
+        $("skip").onclick = skipCurrent;
+        return;
+      }
+      $("main").innerHTML = `
+        <p class="mono" style="color:var(--muted)">${data.traceId}</p>
+        <h2 class="goal">${escapeHtml(state.goal || "(no goal)")}</h2>
+        <div class="facts">
+          <span class="chip">${escapeHtml(data.decision)}</span>
+          <span class="chip">${escapeHtml(state.environment)}</span>
+          <span class="chip">${escapeHtml(state.action.tool)} ${escapeHtml(state.action.operation)}</span>
+          ${data.outcome ? `<span class="chip">exit ${data.outcome.exitCode ?? "?"}</span>` : ""}
+          ${data.rules?.length ? `<span class="chip">rules ${data.rules.join(", ")}</span>` : ""}
+        </div>
+        <pre class="cmd mono">${escapeHtml(state.action.command || state.action.target || "")}</pre>
+        <dl class="kv">
+          <dt>plan</dt><dd>${escapeHtml(state.plan || "—")}</dd>
+          <dt>repo</dt><dd>${escapeHtml(state.repo.branch || "?")} ${state.repo.dirty ? "dirty" : "clean"} · ${(state.repo.changed || []).slice(0, 8).join(", ") || "no changed files"}</dd>
+          <dt>recent</dt><dd>${(state.recent || []).join(" → ") || "—"}</dd>
+        </dl>
+        <p class="hint">Do not copy Laya’s guess. Label what <em>you</em> would decide.</p>
+        ${layaChip("handling", data.laya)}
+        <form id="labelform">
+          ${choiceField("task_alignment", q.task_alignment || {}, lab.task_alignment)}
+          ${noulField("destructive_risk", q.destructive_risk || {}, lab.destructive_risk)}
+          ${noulField("sensitive_resource", q.sensitive_resource || {}, lab.sensitive_resource)}
+          ${noulField("external_impact", q.external_impact || {}, lab.external_impact)}
+          ${choiceField("reversibility", q.reversibility || {}, lab.reversibility)}
+          ${noulField("verification_needed", q.verification_needed || {}, lab.verification_needed)}
+          ${choiceField("handling", q.handling || {}, lab.handling)}
+          <p class="err" id="err"></p>
+          <footer class="bar">
+            <button type="submit" class="save">Save <kbd>enter</kbd></button>
+            <button type="button" class="skip" id="skip">Skip <kbd>s</kbd></button>
+            <span class="hint">j / k next in list</span>
+          </footer>
+        </form>
+      `;
+      form = $("labelform");
+      form.querySelectorAll("input[type=range]").forEach((el) => {
+        el.addEventListener("input", () => { el.parentElement.querySelector("output").textContent = noulVal(el.value); });
+      });
+      form.onsubmit = (e) => { e.preventDefault(); saveCurrent(); };
+      $("skip").onclick = skipCurrent;
+    }
+
+    function readForm() {
+      const fd = new FormData(form);
+      const get = (k) => fd.get(k);
+      return {
+        trace_id: currentId,
+        source: "human",
+        task_alignment: get("task_alignment"),
+        destructive_risk: Number(get("destructive_risk")),
+        sensitive_resource: Number(get("sensitive_resource")),
+        external_impact: Number(get("external_impact")),
+        reversibility: get("reversibility"),
+        verification_needed: Number(get("verification_needed")),
+        handling: get("handling"),
+      };
+    }
+
+    async function saveCurrent() {
+      const err = $("err");
+      try {
+        await api("/api/labels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(readForm()),
+        });
+        await reload(true);
+      } catch (e) {
+        if (err) err.textContent = e.message;
+      }
+    }
+
+    async function skipCurrent() {
+      await api("/api/skip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trace_id: currentId }),
+      });
+      await reload(true);
+    }
+
+    function nextAfter(id) {
+      const rows = filtered();
+      const idx = rows.findIndex((r) => r.traceId === id);
+      if (idx >= 0 && idx < rows.length - 1) return rows[idx + 1].traceId;
+      if (rows.length) return rows[0].traceId;
+      return null;
+    }
+
+    async function openTrace(id) {
+      currentId = id;
+      renderList();
+      const data = await api("/api/traces/" + encodeURIComponent(id));
+      renderDetail(data);
+    }
+
+    async function reload(advance) {
+      const prev = currentId;
+      const data = await api("/api/queue");
+      items = data.items;
+      renderCounts(data.counts);
+      renderList();
+      let id = prev;
+      if (advance) id = nextAfter(prev);
+      if (!id || !items.some((it) => it.traceId === id && it.status === filter)) {
+        const rows = filtered();
+        id = rows[0] && rows[0].traceId;
+      }
+      if (id) await openTrace(id);
+      else $("main").innerHTML = `<p class="empty">No traces in ${filter}. New actions appear here after the daemon+hooks run.</p>`;
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.target.matches("input[type=text], textarea")) return;
+      if (e.key === "s" && !e.metaKey && !e.ctrlKey) { e.preventDefault(); skipCurrent(); }
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && form) { e.preventDefault(); saveCurrent(); }
+      if (e.key === "j" || e.key === "k") {
+        const rows = filtered();
+        const idx = rows.findIndex((r) => r.traceId === currentId);
+        const next = e.key === "j" ? rows[idx + 1] : rows[idx - 1];
+        if (next) openTrace(next.traceId);
+      }
+    });
+
+    reload(false).catch((e) => { $("main").innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`; });
+  </script>
+</body>
+</html>

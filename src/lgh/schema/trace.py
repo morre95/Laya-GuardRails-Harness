@@ -4,6 +4,7 @@ from pydantic import Field
 
 from lgh.schema.base import FrozenModel
 from lgh.schema.decision import GuardrailDecision
+from lgh.schema.envelope import LayaState
 from lgh.schema.laya import LayaAssessment
 
 
@@ -42,6 +43,7 @@ class DecisionTrace(FrozenModel):
     prev_hash: str | None = Field(default=None, alias="prevHash")
     rule_evaluation: RuleEvaluation = Field(alias="ruleEvaluation")
     laya: LayaTrace | None = None
+    state: LayaState | None = None
     policy_decision: GuardrailDecision = Field(alias="policyDecision")
     frontier: FrontierTrace | None = None
     human: HumanTrace | None = None

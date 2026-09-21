@@ -6,7 +6,7 @@ from pathlib import Path
 from lgh.ids import new_id, utc_now_iso
 from lgh.paths import traces_dir
 from lgh.schema.decision import GuardrailDecision, Mode
-from lgh.schema.envelope import ActionEnvelope
+from lgh.schema.envelope import ActionEnvelope, LayaState
 from lgh.schema.laya import LayaAssessment
 from lgh.schema.rules import RuleResult
 from lgh.schema.trace import (
@@ -37,6 +37,7 @@ def build_trace(
     outcome: Outcome | None = None,
     error: str | None = None,
     prev_hash: str | None = None,
+    state: LayaState | None = None,
 ) -> DecisionTrace:
     laya_trace = None
     if laya is not None:
@@ -54,6 +55,7 @@ def build_trace(
             disposition=str(rules.disposition),
         ),
         laya=laya_trace,
+        state=state,
         policyDecision=policy_decision,
         frontier=frontier,
         human=human,
