@@ -230,7 +230,7 @@ uv run lgh calibrate
 uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
 ```
 
-`lgh review` is a localhost labeling desk. It shows the stored `LayaState` and the seven questions. Completing a label writes `~/.local/share/lgh/labels.jsonl`. Traces collected **before** this change have no state and cannot be labeled; new hook events can.
+`lgh review` is a localhost labeling desk. It shows the stored `LayaState` and the seven questions. Completing a label writes `~/.local/share/lgh/labels.jsonl`. Check several traces (Shift-click for a range, or **Select visible**) and Save once to write the same values to all of them. Traces collected **before** this change have no state and cannot be labeled; new hook events can.
 
 `--propose` asks a teacher LLM to prefill the seven answers for the open unlabeled trace. `--teacher llm` is the only teacher in this version; `--propose` alone defaults to it. Suggestions fill the form and are **not** saved until you click Save (the stored label is still `source: human`). Uncheck **Ask LLM** in the UI to stop proposals without restarting. Set the model in **user** config (`~/.config/lgh/config.yaml`); a repo cannot retarget it:
 

@@ -6,13 +6,46 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from lgh.eval.labels import LabelError, append_label, load_skips, save_skips
+from lgh.eval.labels import LabelError, append_labels, load_skips, save_skips
 from lgh.resources import read_package_text
 from lgh.review.queue import ReviewStore
 from lgh.teacher import TeacherError
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8770
+MAX_BULK = 200
+LABEL_FIELDS = (
+    "source",
+    "task_alignment",
+    "destructive_risk",
+    "sensitive_resource",
+    "external_impact",
+    "reversibility",
+    "verification_needed",
+    "handling",
+)
+
+
+def _trace_ids(payload: dict[str, Any]) -> list[str]:
+    raw = payload.get("trace_ids")
+    if raw is None:
+        one = str(payload.get("trace_id") or "").strip()
+        return [one] if one else []
+    if not isinstance(raw, list):
+        raise LabelError("trace_ids must be a list")
+    ids: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        trace_id = str(item or "").strip()
+        if not trace_id or trace_id in seen:
+            continue
+        seen.add(trace_id)
+        ids.append(trace_id)
+    return ids
+
+
+def _label_answers(payload: dict[str, Any]) -> dict[str, Any]:
+    return {key: payload.get(key) for key in LABEL_FIELDS}
 
 
 def make_handler(
@@ -66,27 +99,11 @@ def make_handler(
             if path == "/api/propose":
                 self._propose(payload)
                 return
-            if path == "/api/labels":
-                try:
-                    record = append_label(payload, directory=store.data_dir)
-                except LabelError as exc:
-                    self._json(400, {"error": str(exc)})
-                    return
-                skipped = load_skips(store.data_dir)
-                if record["trace_id"] in skipped:
-                    skipped.remove(record["trace_id"])
-                    save_skips(skipped, store.data_dir)
-                self._json(200, {"ok": True, "label": record})
+            if path in {"/api/labels", "/api/labels/bulk"}:
+                self._labels(payload)
                 return
             if path == "/api/skip":
-                trace_id = str(payload.get("trace_id") or "").strip()
-                if not trace_id:
-                    self._json(400, {"error": "trace_id is required"})
-                    return
-                skipped = load_skips(store.data_dir)
-                skipped.add(trace_id)
-                save_skips(skipped, store.data_dir)
-                self._json(200, {"ok": True, "skipped": True})
+                self._skip(payload)
                 return
             if path == "/api/unskip":
                 trace_id = str(payload.get("trace_id") or "").strip()
@@ -96,6 +113,61 @@ def make_handler(
                 self._json(200, {"ok": True, "skipped": False})
                 return
             self._json(404, {"error": "not found"})
+
+        def _labels(self, payload: dict[str, Any]) -> None:
+            try:
+                ids = _trace_ids(payload)
+            except LabelError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            if not ids:
+                self._json(400, {"error": "trace_id is required"})
+                return
+            if len(ids) > MAX_BULK:
+                self._json(400, {"error": f"at most {MAX_BULK} traces per save"})
+                return
+            by_id = {row["traceId"]: row for row in store.items()}
+            missing = [tid for tid in ids if tid not in by_id]
+            if missing:
+                self._json(404, {"error": "trace not found: " + ", ".join(missing[:8])})
+                return
+            no_state = [tid for tid in ids if not by_id[tid].get("hasState")]
+            if no_state:
+                self._json(400, {"error": "trace has no state: " + ", ".join(no_state[:8])})
+                return
+            answers = _label_answers(payload)
+            records = [{"trace_id": tid, **answers} for tid in ids]
+            try:
+                saved = append_labels(records, directory=store.data_dir)
+            except LabelError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            skipped = load_skips(store.data_dir)
+            changed = False
+            for record in saved:
+                if record["trace_id"] in skipped:
+                    skipped.remove(record["trace_id"])
+                    changed = True
+            if changed:
+                save_skips(skipped, store.data_dir)
+            self._json(200, {"ok": True, "count": len(saved), "labels": saved, "label": saved[0]})
+
+        def _skip(self, payload: dict[str, Any]) -> None:
+            try:
+                ids = _trace_ids(payload)
+            except LabelError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            if not ids:
+                self._json(400, {"error": "trace_id is required"})
+                return
+            if len(ids) > MAX_BULK:
+                self._json(400, {"error": f"at most {MAX_BULK} traces per skip"})
+                return
+            skipped = load_skips(store.data_dir)
+            skipped.update(ids)
+            save_skips(skipped, store.data_dir)
+            self._json(200, {"ok": True, "skipped": True, "count": len(ids), "trace_ids": ids})
 
         def _propose(self, payload: dict[str, Any]) -> None:
             if teacher is None:

@@ -141,6 +141,7 @@ def test_review_http_roundtrip(tmp_path) -> None:
         assert "LGH review" in page
         assert 'id="teacher-on"' in page
         assert 'id="teacher-toggle"' in page
+        assert 'id="select-visible"' in page
         body = json.dumps(
             {
                 "trace_id": result.trace.trace_id,
@@ -214,3 +215,98 @@ def test_review_http_propose(tmp_path) -> None:
         assert exc.value.code == 404
     finally:
         httpd.shutdown()
+
+
+def _label_body(**extra) -> dict:
+    return {
+        "source": "human",
+        "handling": "allow",
+        "task_alignment": "aligned",
+        "reversibility": "trivial",
+        "destructive_risk": 0.0,
+        "sensitive_resource": 0.0,
+        "external_impact": 0.0,
+        "verification_needed": 0.1,
+        **extra,
+    }
+
+
+def test_review_http_bulk_labels(tmp_path) -> None:
+    from http.server import ThreadingHTTPServer
+
+    pipe, env = _pipe(tmp_path, command="echo one")
+    first = pipe.evaluate(env)
+    second = pipe.evaluate(make_envelope(command="echo two", goal="say hello"))
+    store = ReviewStore(traces_dir=tmp_path / "t", data_dir=tmp_path)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(store))
+    thread = Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = httpd.server_address[1]
+        base = f"http://127.0.0.1:{port}"
+        body = json.dumps(
+            _label_body(
+                trace_ids=[first.trace.trace_id, second.trace.trace_id],
+                handling="verify",
+            )
+        ).encode()
+        req = Request(base + "/api/labels", data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        saved = json.loads(urlopen(req, timeout=2).read())
+        assert saved["count"] == 2
+        assert {row["trace_id"] for row in saved["labels"]} == {
+            first.trace.trace_id,
+            second.trace.trace_id,
+        }
+        assert all(row["handling"] == "verify" for row in saved["labels"])
+        queue = json.loads(urlopen(base + "/api/queue", timeout=2).read())
+        assert queue["counts"]["labeled"] == 2
+        assert queue["counts"]["unlabeled"] == 0
+    finally:
+        httpd.shutdown()
+
+
+def test_review_http_bulk_skip(tmp_path) -> None:
+    from http.server import ThreadingHTTPServer
+
+    pipe, env = _pipe(tmp_path, command="echo one")
+    first = pipe.evaluate(env)
+    second = pipe.evaluate(make_envelope(command="echo two", goal="say hello"))
+    store = ReviewStore(traces_dir=tmp_path / "t", data_dir=tmp_path)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(store))
+    thread = Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = httpd.server_address[1]
+        base = f"http://127.0.0.1:{port}"
+        req = Request(
+            base + "/api/skip",
+            data=json.dumps(
+                {"trace_ids": [first.trace.trace_id, second.trace.trace_id]}
+            ).encode(),
+            method="POST",
+        )
+        req.add_header("Content-Type", "application/json")
+        skipped = json.loads(urlopen(req, timeout=2).read())
+        assert skipped["count"] == 2
+        queue = json.loads(urlopen(base + "/api/queue", timeout=2).read())
+        assert queue["counts"]["skipped"] == 2
+        assert queue["counts"]["unlabeled"] == 0
+    finally:
+        httpd.shutdown()
+
+
+def test_append_labels_writes_each_trace(tmp_path) -> None:
+    from lgh.eval.labels import append_labels, latest_labels
+
+    rows = append_labels(
+        [
+            _label_body(trace_id="a", handling="replan"),
+            _label_body(trace_id="b", handling="replan"),
+        ],
+        directory=tmp_path,
+    )
+    assert len(rows) == 2
+    latest = latest_labels(tmp_path)
+    assert latest["a"]["handling"] == "replan"
+    assert latest["b"]["handling"] == "replan"

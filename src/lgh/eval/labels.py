@@ -88,12 +88,19 @@ def normalize_label(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def append_label(record: dict, directory: Path | None = None) -> dict[str, Any]:
-    normalized = normalize_label(record)
+def append_labels(records: list[dict], directory: Path | None = None) -> list[dict[str, Any]]:
+    if not records:
+        raise LabelError("no labels to write")
+    normalized = [normalize_label(record) for record in records]
     path = labels_path(directory)
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(normalized) + "\n")
+        for row in normalized:
+            handle.write(json.dumps(row) + "\n")
     return normalized
+
+
+def append_label(record: dict, directory: Path | None = None) -> dict[str, Any]:
+    return append_labels([record], directory=directory)[0]
 
 
 def load_labels(directory: Path | None = None) -> list[dict]:

@@ -69,14 +69,39 @@
     .counts button.on { border-color: var(--amber); color: var(--amber); }
     .counts strong { display: block; font-size: 16px; }
     .list { overflow: auto; flex: 1; border-top: 1px solid var(--line); }
+    .list-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      position: sticky;
+      top: 0;
+      background: var(--bg-2);
+      z-index: 1;
+    }
     .item {
-      display: block; width: 100%; text-align: left;
-      background: transparent; color: inherit;
-      border: 0; border-bottom: 1px solid var(--line);
-      padding: 10px 14px; cursor: pointer;
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      align-items: start;
+      gap: 8px;
+      width: 100%;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 14px;
     }
     .item:hover { background: #2a231c; }
     .item.on { background: #2f261c; box-shadow: inset 3px 0 0 var(--amber); }
+    .item.picked { background: #241e16; }
+    .item.picked.on { background: #2f261c; }
+    .item .pick { margin-top: 3px; accent-color: var(--amber); }
+    .item .open {
+      display: block; width: 100%; text-align: left;
+      background: transparent; color: inherit;
+      border: 0; padding: 0; cursor: pointer; font: inherit;
+    }
     .item .sum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .item .meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
     main { overflow: auto; padding: 22px 28px 96px; }
@@ -183,6 +208,8 @@
     let form = null;
     let teacherAvailable = false;
     let proposeEnabled = false;
+    const selected = new Set();
+    let lastPickIndex = null;
 
     const CHOICE = {
       task_alignment: ["aligned", "supporting", "unclear", "outside_scope"],
@@ -217,6 +244,7 @@
         const b = e.target.closest("button");
         if (!b) return;
         filter = b.dataset.f;
+        lastPickIndex = null;
         renderList();
         renderCounts(counts);
       };
@@ -228,16 +256,94 @@
 
     function renderList() {
       const rows = filtered();
-      $("list").innerHTML = rows.map((it) => `
-        <button class="item ${it.traceId === currentId ? "on" : ""}" data-id="${it.traceId}">
-          <div class="sum mono">${escapeHtml(it.summary)}</div>
-          <div class="meta mono">${it.decision} · ${it.timestamp.slice(0, 19)}</div>
-        </button>
-      `).join("") || `<p class="empty" style="padding:16px">Nothing in ${filter}.</p>`;
-      $("list").onclick = (e) => {
-        const b = e.target.closest(".item");
-        if (b) openTrace(b.dataset.id);
+      const visibleIds = rows.filter((it) => it.hasState).map((it) => it.traceId);
+      const allOn = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+      const picks = [...selected].filter((id) => items.some((it) => it.traceId === id)).length;
+      $("list").innerHTML = `
+        <div class="list-bar">
+          <label class="toggle" style="margin:0">
+            <input type="checkbox" id="select-visible" ${allOn ? "checked" : ""} ${visibleIds.length ? "" : "disabled"}>
+            Select visible
+          </label>
+          <span>${picks ? picks + " selected" : "Shift-click range"}</span>
+        </div>
+      ` + (rows.map((it) => `
+        <div class="item ${it.traceId === currentId ? "on" : ""} ${selected.has(it.traceId) ? "picked" : ""}" data-id="${it.traceId}">
+          <input type="checkbox" class="pick" data-id="${it.traceId}"
+            ${selected.has(it.traceId) ? "checked" : ""} ${it.hasState ? "" : "disabled"}>
+          <button type="button" class="open" data-id="${it.traceId}">
+            <div class="sum mono">${escapeHtml(it.summary)}</div>
+            <div class="meta mono">${it.decision} · ${it.timestamp.slice(0, 19)}</div>
+          </button>
+        </div>
+      `).join("") || `<p class="empty" style="padding:16px">Nothing in ${filter}.</p>`);
+      const vis = $("select-visible");
+      if (vis) vis.onchange = () => {
+        if (vis.checked) visibleIds.forEach((id) => selected.add(id));
+        else visibleIds.forEach((id) => selected.delete(id));
+        lastPickIndex = null;
+        renderList();
+        updateBulkButtons();
       };
+      $("list").onclick = (e) => {
+        const pick = e.target.closest(".pick");
+        if (pick) {
+          e.stopPropagation();
+          togglePick(pick.dataset.id, { range: e.shiftKey });
+          return;
+        }
+        const b = e.target.closest(".open, .item");
+        if (b && b.dataset.id) openTrace(b.dataset.id);
+      };
+      updateBulkButtons();
+    }
+
+    function togglePick(id, { range } = {}) {
+      const row = items.find((it) => it.traceId === id);
+      if (!row || !row.hasState) return;
+      const rows = filtered();
+      const idx = rows.findIndex((it) => it.traceId === id);
+      if (range && lastPickIndex != null && idx >= 0) {
+        const lo = Math.min(lastPickIndex, idx);
+        const hi = Math.max(lastPickIndex, idx);
+        for (let i = lo; i <= hi; i++) {
+          if (rows[i].hasState) selected.add(rows[i].traceId);
+        }
+      } else if (selected.has(id)) {
+        selected.delete(id);
+      } else {
+        selected.add(id);
+      }
+      if (idx >= 0) lastPickIndex = idx;
+      renderList();
+    }
+
+    function idsToApply() {
+      const ids = [...selected].filter((id) => {
+        const it = items.find((row) => row.traceId === id);
+        return it && it.hasState;
+      });
+      if (ids.length) return ids;
+      return currentId ? [currentId] : [];
+    }
+
+    function updateBulkButtons() {
+      const n = idsToApply().length;
+      const save = document.querySelector("#labelform button.save");
+      const skip = $("skip");
+      const hint = $("bulk-hint");
+      if (save) {
+        save.innerHTML = n > 1 ? `Save ${n}` : `Save <kbd>enter</kbd>`;
+      }
+      if (skip) {
+        skip.innerHTML = n > 1 ? `Skip ${n}` : `Skip <kbd>s</kbd>`;
+      }
+      if (hint) {
+        hint.hidden = n <= 1;
+        hint.textContent = n > 1
+          ? `Saving or skipping applies these values to ${n} selected traces.`
+          : "";
+      }
     }
 
     function escapeHtml(s) {
@@ -324,6 +430,7 @@
         <p class="hint">Do not copy Laya’s guess. Label what <em>you</em> would decide.</p>
         ${layaChip("handling", data.laya)}
         ${proposeEnabled && data.status === "unlabeled" ? `<p class="proposal" id="proposal">Asking teacher…</p>` : `<p class="proposal" id="proposal" hidden></p>`}
+        <p class="warn" id="bulk-hint" hidden></p>
         <form id="labelform">
           ${choiceField("task_alignment", q.task_alignment || {}, lab.task_alignment)}
           ${noulField("destructive_risk", q.destructive_risk || {}, lab.destructive_risk)}
@@ -346,13 +453,13 @@
       });
       form.onsubmit = (e) => { e.preventDefault(); saveCurrent(); };
       $("skip").onclick = skipCurrent;
+      updateBulkButtons();
     }
 
     function readForm() {
       const fd = new FormData(form);
       const get = (k) => fd.get(k);
       return {
-        trace_id: currentId,
         source: "human",
         task_alignment: get("task_alignment"),
         destructive_risk: Number(get("destructive_risk")),
@@ -366,12 +473,17 @@
 
     async function saveCurrent() {
       const err = $("err");
+      const ids = idsToApply();
       try {
+        const body = { ...readForm() };
+        if (ids.length === 1) body.trace_id = ids[0];
+        else body.trace_ids = ids;
         await api("/api/labels", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(readForm()),
+          body: JSON.stringify(body),
         });
+        ids.forEach((id) => selected.delete(id));
         await reload(true);
       } catch (e) {
         if (err) err.textContent = e.message;
@@ -379,11 +491,14 @@
     }
 
     async function skipCurrent() {
+      const ids = idsToApply();
+      const body = ids.length === 1 ? { trace_id: ids[0] } : { trace_ids: ids };
       await api("/api/skip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trace_id: currentId }),
+        body: JSON.stringify(body),
       });
+      ids.forEach((id) => selected.delete(id));
       await reload(true);
     }
 
@@ -491,6 +606,10 @@
     document.addEventListener("keydown", (e) => {
       if (e.target.matches("input, textarea, button")) return;
       if (e.key === "s" && !e.metaKey && !e.ctrlKey) { e.preventDefault(); skipCurrent(); }
+      if (e.key === "x" && !e.metaKey && !e.ctrlKey && currentId) {
+        e.preventDefault();
+        togglePick(currentId, { range: e.shiftKey });
+      }
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && form) { e.preventDefault(); saveCurrent(); }
       if (e.key === "j" || e.key === "k") {
         const rows = filtered();
