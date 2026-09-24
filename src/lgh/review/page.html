@@ -532,7 +532,19 @@
       }
     }
 
+    let proposalAbort = null;
+
+    function cancelProposal() {
+      if (proposalAbort) {
+        proposalAbort.abort();
+        proposalAbort = null;
+      }
+    }
+
     async function fetchProposal(id) {
+      cancelProposal();
+      const controller = new AbortController();
+      proposalAbort = controller;
       const err = $("err");
       const banner = $("proposal");
       try {
@@ -540,19 +552,24 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ trace_id: id }),
+          signal: controller.signal,
         });
-        if (currentId !== id) return;
+        if (currentId !== id || controller.signal.aborted) return;
         applyProposal(proposal);
       } catch (e) {
+        if (e.name === "AbortError" || controller.signal.aborted) return;
         if (banner) {
           banner.hidden = false;
           banner.textContent = "Teacher failed: " + e.message;
         }
         if (err) err.textContent = e.message;
+      } finally {
+        if (proposalAbort === controller) proposalAbort = null;
       }
     }
 
     async function openTrace(id) {
+      cancelProposal();
       currentId = id;
       renderList();
       const data = await api("/api/traces/" + encodeURIComponent(id));
@@ -589,6 +606,7 @@
     async function setProposeEnabled(on) {
       proposeEnabled = Boolean(on);
       if (!proposeEnabled) {
+        cancelProposal();
         hideProposal();
         return;
       }

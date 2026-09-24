@@ -296,6 +296,27 @@ def test_review_http_bulk_skip(tmp_path) -> None:
         httpd.shutdown()
 
 
+def test_send_swallows_broken_pipe(tmp_path) -> None:
+    """A browser that reloads mid-teacher-call must not crash the handler thread."""
+    import io
+
+    class BrokenSocket(io.RawIOBase):
+        def write(self, _data) -> int:
+            raise BrokenPipeError(32, "Broken pipe")
+
+    store = ReviewStore(traces_dir=tmp_path / "t", data_dir=tmp_path)
+    Handler = make_handler(store)
+    handler = Handler.__new__(Handler)
+    handler.wfile = BrokenSocket()
+    handler.request_version = "HTTP/1.1"
+    handler.close_connection = False
+    handler._headers_buffer = []
+    handler.requestline = "POST /api/propose HTTP/1.1"
+    handler.command = "POST"
+    handler._json(200, {"ok": True})
+    assert handler.close_connection is True
+
+
 def test_append_labels_writes_each_trace(tmp_path) -> None:
     from lgh.eval.labels import append_labels, latest_labels
 

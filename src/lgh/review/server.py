@@ -205,12 +205,18 @@ def make_handler(
             self._send(status, body, "application/json")
 
         def _send(self, status: int, body: bytes, content_type: str) -> None:
-            self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                # The browser closed the socket before the reply landed
+                # (page reload or trace switch while a slow teacher call was
+                # in flight). Nothing to recover; the label was never written.
+                self.close_connection = True
 
     return Handler
 
