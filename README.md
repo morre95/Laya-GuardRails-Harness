@@ -226,11 +226,14 @@ uv run lgh label TRACE_ID --source human --handling replan \
   --task-alignment outside_scope --reversibility recoverable \
   --destructive-risk 0.2 --sensitive-resource 0 --external-impact 0.1 \
   --verification-needed 0.8
+uv run lgh triage -n 50           # skipped/unlabeled traces most likely to be risk cases
 uv run lgh calibrate
 uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
 ```
 
 `lgh review` is a localhost labeling desk. It shows the stored `LayaState` and the seven questions. Completing a label writes `~/.local/share/lgh/labels.jsonl`. Check several traces (Shift-click for a range, or **Select visible**) and Save once to write the same values to all of them. Traces collected **before** this change have no state and cannot be labeled; new hook events can.
+
+`lgh triage` ranks skipped and unlabeled traces by rule disposition (BLOCK/HUMAN/VERIFY), destructive/external/sensitive command patterns, and a weak bonus when Laya's shadow assessment flags risk. It prints score, trace id, status, command and the reasons; `--json` emits one object per line and `--min-score` drops weak candidates. Use it to find the rare `replan`/`escalate`/`irreversible` cases the dataset lacks. Laya's output only orders the list; it is never a label. The review UI shows the same score on each row (hover for reasons) and a **Time / Risk** toggle; with Risk on, Save moves to the next riskiest trace.
 
 `--propose` asks a teacher LLM to prefill the seven answers for the open unlabeled trace. `--teacher llm` is the only teacher in this version; `--propose` alone defaults to it. Suggestions fill the form and are **not** saved until you click Save (the stored label is still `source: human`). Uncheck **Ask LLM** in the UI to stop proposals without restarting. Set the model in **user** config (`~/.config/lgh/config.yaml`); a repo cannot retarget it:
 

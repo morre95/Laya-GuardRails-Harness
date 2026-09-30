@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from lgh.eval.labels import latest_labels, load_skips
 from lgh.laya.questions import load_questions
+from lgh.review.triage import RiskScore, score_trace
 from lgh.schema.trace import DecisionTrace
 from lgh.trace.reader import iter_traces
 
@@ -51,6 +52,7 @@ class ReviewStore:
         rows = []
         for trace in unique_traces(list(iter_traces(self.traces_dir))):
             status = _status(trace, labels, skipped)
+            risk = score_trace(trace) if trace.state is not None else RiskScore()
             rows.append(
                 {
                     "traceId": trace.trace_id,
@@ -60,8 +62,20 @@ class ReviewStore:
                     "policyDecision": str(trace.policy_decision),
                     "summary": _summary(trace),
                     "hasState": trace.state is not None,
+                    "risk": risk.score,
+                    "riskReasons": risk.reasons,
                 }
             )
+        return rows
+
+    def risk_candidates(self, min_score: int = 1) -> list[dict[str, Any]]:
+        """Skipped/unlabeled rows at or above min_score, riskiest first."""
+        rows = [
+            row
+            for row in self.items()
+            if row["status"] in ("skipped", "unlabeled") and row["risk"] >= min_score
+        ]
+        rows.sort(key=lambda row: (-row["risk"], row["timestamp"]))
         return rows
 
     def counts(self, rows: list[dict[str, Any]] | None = None) -> dict[str, int]:

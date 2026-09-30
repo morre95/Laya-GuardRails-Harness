@@ -104,6 +104,16 @@
     }
     .item .sum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .item .meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .sort { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+    .sort button {
+      font: inherit; font-size: 11px;
+      background: transparent; color: var(--muted);
+      border: 0; padding: 2px 8px; cursor: pointer;
+    }
+    .sort button.on { background: var(--amber); color: var(--bg); }
+    .risk { font-weight: 600; margin-right: 4px; }
+    .risk.high { color: var(--rose); }
+    .risk.mid { color: var(--amber); }
     main { overflow: auto; padding: 22px 28px 96px; }
     .empty { color: var(--muted); max-width: 36em; }
     .goal { font-size: 22px; margin: 0 0 8px; }
@@ -204,6 +214,8 @@
     const $ = (id) => document.getElementById(id);
     let items = [];
     let filter = "unlabeled";
+    let sortBy = "time";
+    try { sortBy = localStorage.getItem("lgh-review-sort") || "time"; } catch (e) { console.warn("sort preference unavailable", e); }
     let currentId = null;
     let form = null;
     let teacherAvailable = false;
@@ -251,7 +263,24 @@
     }
 
     function filtered() {
-      return items.filter((it) => it.status === filter);
+      const rows = items.filter((it) => it.status === filter);
+      if (sortBy === "risk") {
+        rows.sort((a, b) => b.risk - a.risk || a.timestamp.localeCompare(b.timestamp));
+      }
+      return rows;
+    }
+
+    function setSort(value) {
+      sortBy = value;
+      try { localStorage.setItem("lgh-review-sort", value); } catch (e) { console.warn("sort preference not saved", e); }
+      lastPickIndex = null;
+      renderList();
+    }
+
+    function riskBadge(it) {
+      if (!it.risk) return "";
+      const level = it.risk >= 5 ? "high" : it.risk >= 3 ? "mid" : "";
+      return `<span class="risk ${level}" title="${escapeHtml(it.riskReasons.join(" "))}">risk ${it.risk}</span> · `;
     }
 
     function renderList() {
@@ -266,6 +295,10 @@
             Select visible
           </label>
           <span>${picks ? picks + " selected" : "Shift-click range"}</span>
+          <div class="sort" id="sort">
+            <button type="button" data-sort="time" class="${sortBy === "time" ? "on" : ""}">Time</button>
+            <button type="button" data-sort="risk" class="${sortBy === "risk" ? "on" : ""}">Risk</button>
+          </div>
         </div>
       ` + (rows.map((it) => `
         <div class="item ${it.traceId === currentId ? "on" : ""} ${selected.has(it.traceId) ? "picked" : ""}" data-id="${it.traceId}">
@@ -273,10 +306,14 @@
             ${selected.has(it.traceId) ? "checked" : ""} ${it.hasState ? "" : "disabled"}>
           <button type="button" class="open" data-id="${it.traceId}">
             <div class="sum mono">${escapeHtml(it.summary)}</div>
-            <div class="meta mono">${it.decision} · ${it.timestamp.slice(0, 19)}</div>
+            <div class="meta mono">${riskBadge(it)}${it.decision} · ${it.timestamp.slice(0, 19)}</div>
           </button>
         </div>
       `).join("") || `<p class="empty" style="padding:16px">Nothing in ${filter}.</p>`);
+      $("sort").onclick = (e) => {
+        const b = e.target.closest("button");
+        if (b && b.dataset.sort !== sortBy) setSort(b.dataset.sort);
+      };
       const vis = $("select-visible");
       if (vis) vis.onchange = () => {
         if (vis.checked) visibleIds.forEach((id) => selected.add(id));

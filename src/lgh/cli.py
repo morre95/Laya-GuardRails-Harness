@@ -78,6 +78,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Teacher when --propose is set (default: llm). Only 'llm' is supported.",
     )
 
+    triage = sub.add_parser("triage", help="Rank skipped/unlabeled traces by likely risk")
+    triage.add_argument("-n", type=int, default=50, help="max candidates to print")
+    triage.add_argument("--min-score", dest="min_score", type=int, default=1)
+    triage.add_argument("--json", action="store_true", help="one JSON object per line")
+
     tail = sub.add_parser("trace", help="Inspect traces")
     tail.add_argument("action", choices=["tail", "watch"])
     tail.add_argument("-n", type=int, default=20, help="backlog records; 0 starts watch on an empty screen")
@@ -99,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
         return _export(args)
     if args.cmd == "review":
         return _review(args)
+    if args.cmd == "triage":
+        return _triage(args)
     if args.cmd == "trace":
         if args.action == "watch":
             return _trace_watch(args.n)
@@ -242,6 +249,21 @@ def _export(args: argparse.Namespace) -> int:
 
     rows = export_dataset(list(iter_traces()), load_labels(), path=args.output)
     print(f"wrote {len(rows)} rows to {args.output}")
+    return 0
+
+
+def _triage(args: argparse.Namespace) -> int:
+    from lgh.review.queue import ReviewStore
+
+    candidates = ReviewStore().risk_candidates(min_score=args.min_score)
+    for row in candidates[: args.n]:
+        if args.json:
+            print(json.dumps(row))
+            continue
+        summary = row["summary"] if len(row["summary"]) <= 100 else row["summary"][:97] + "..."
+        print(f"{row['risk']:>3}  {row['traceId']}  {row['status']:<9}  {summary}")
+        print(f"     {' '.join(row['riskReasons'])}")
+    print(f"{len(candidates)} candidates (showing {min(args.n, len(candidates))})", file=sys.stderr)
     return 0
 
 
