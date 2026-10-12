@@ -252,8 +252,41 @@ Fine-tune Laya on your labels (needs the `laya` extra; a CUDA GPU is strongly re
 
 ```bash
 uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
-USE_TF=0 uv run laya lgh train --dataset /tmp/lgh-dataset.jsonl --epochs 4 --device cuda
+USE_TF=0 uv run --extra laya lgh train --dataset /tmp/lgh-dataset.jsonl --epochs 4 --device cuda
 ```
+
+### Träningsflaggor
+
+Kör kommandona från projektmappen. `uv run` kör `lgh train` i projektets Pythonmiljö. `--extra laya` hör till **uv** och ser till att de valfria Laya-beroendena i `pyproject.toml` finns i miljön innan träningen startar. Dessa beroenden inkluderas inte automatiskt. Se [uv:s dokumentation om extras](https://docs.astral.sh/uv/concepts/projects/sync/#syncing-optional-dependencies).
+
+| Flagga eller inställning | Betydelse och standardvärde |
+| --- | --- |
+| `USE_TF=0` | Miljövariabel för processen, placerad före kommandot. Används för att stänga av TensorFlow-stödet där det stöds; Laya-träningen använder PyTorch. |
+| `uv run --extra laya` | Inkluderar projektets extra `laya`, som definieras som `laya>=0.1`, och paketets beroenden. Påverkar vilka paket som finns tillgängliga. |
+| `--dataset <fil>` | Obligatorisk flagga till `lgh train`. Anger JSONL-filen från `lgh export-dataset`. `labels.jsonl` och `kandidater.jsonl` kan inte användas direkt som träningsdataset. |
+| `--epochs <antal>` | Maximalt antal genomgångar av träningsdatan. Standard: `4`. Träningen kan avslutas tidigare om valideringsförlusten slutar förbättras. Vikterna med lägst valideringsförlust sparas. |
+| `--device cuda` | Kör träningen på en CUDA-kompatibel GPU. Standard: `cuda`; kräver tillgängligt CUDA-stöd. `cpu` kör på processorn och är långsammare. `gpu` accepteras som alias för `cuda`. |
+| `--base <modell-id eller katalog>` | Modellen som träningen utgår från. Standard: `convaiinnovations/laya-typed-decisions`. Ange en tidigare tränad modellkatalog för att fortsätta finjustera dess vikter. Optimeraren startas om; detta återupptar inte en avbruten körning exakt. |
+| `--output <katalog>` | Katalog för modellvikter, modellkonfiguration och `report.json`. Standard: `~/.local/share/lgh/models/<UTC-tidsstämpel>/` (eller motsvarande under `XDG_DATA_HOME`). Katalogen får inte redan finnas. |
+
+Exempel för CPU:
+
+```bash
+USE_TF=0 uv run --extra laya lgh train --dataset /tmp/lgh-dataset.jsonl --device cpu
+```
+
+Exempel för fortsatt finjustering av en tidigare modell till en ny katalog; byt ut modellvägen mot din egen:
+
+```bash
+USE_TF=0 uv run --extra laya lgh train \
+  --dataset /tmp/lgh-dataset.jsonl \
+  --base /home/you/.local/share/lgh/models/20261012T120000Z \
+  --output ./models/laya-next \
+  --epochs 4 \
+  --device cuda
+```
+
+Visa alla tillgängliga träningsflaggor med `uv run lgh train --help`. Inlärningshastighet, gradientackumulering och valideringsandel har för närvarande inga CLI-flaggor. En träningskörning sparar modellen; för att använda den i daemonen behöver du ange modellvägen enligt instruktionerna nedan.
 
 Training minimizes log loss (a strictly proper scoring rule) against the human labels, so probabilities stay calibratable; `noul` labels are soft targets (`0.2` trains toward 20 %). The newest 20 % of rows by timestamp are held out for validation and early stopping. Afterwards one temperature per question type and option count is fitted on that split and written into the checkpoint.
 
