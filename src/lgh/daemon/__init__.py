@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from lgh.daemon.server import MODEL_ID
 from lgh.ids import utc_now_iso
 from lgh.paths import daemon_log_path, daemon_pid_path, user_config_path, user_state_dir
 
@@ -140,10 +141,16 @@ def start(
     host: str = "127.0.0.1",
     port: int = 8765,
     device: str = "cpu",
+    model: str = MODEL_ID,
     timeout: float = 180.0,
 ) -> None:
     health = _read_health(host, port)
     if is_running() and health and health.get("ok"):
+        if health.get("model") != model:
+            raise DaemonError(
+                f"The running daemon serves {health.get('model')!r}, not {model!r}.\n"
+                "Run `lgh daemon stop`, then start again to load the configured model."
+            )
         return
     if is_running() and health is not None and not health.get("ok"):
         stop()
@@ -154,7 +161,7 @@ def start(
     user_state_dir().mkdir(parents=True, exist_ok=True)
     log_path = daemon_log_path()
     log = log_path.open("a", encoding="utf-8")
-    log.write(f"{LOG_START_MARKER}{utc_now_iso()} host={host} port={port} ===\n")
+    log.write(f"{LOG_START_MARKER}{utc_now_iso()} host={host} port={port} model={model} ===\n")
     log.flush()
     env = os.environ.copy()
     env["USE_TF"] = "0"
@@ -169,6 +176,8 @@ def start(
             str(port),
             "--device",
             device,
+            "--model",
+            model,
         ],
         stdout=log,
         stderr=log,

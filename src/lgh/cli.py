@@ -62,6 +62,13 @@ def main(argv: list[str] | None = None) -> int:
     export = sub.add_parser("export-dataset", help="Export labeled traces")
     export.add_argument("--output", type=Path, required=True)
 
+    train = sub.add_parser("train", help="Fine-tune Laya on an exported dataset")
+    train.add_argument("--dataset", type=Path, required=True, help="output of `lgh export-dataset`")
+    train.add_argument("--output", type=Path, default=None, help="default: <data dir>/models/<UTC time>")
+    train.add_argument("--base", default=None, help="base checkpoint (default: the stock Laya model)")
+    train.add_argument("--epochs", type=int, default=4)
+    train.add_argument("--device", default="cuda", help="torch device (cpu, cuda). 'gpu' is an alias for cuda.")
+
     review = sub.add_parser("review", help="Open a local UI for labeling traces")
     review.add_argument("--host", default="127.0.0.1")
     review.add_argument("--port", type=int, default=8770)
@@ -102,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         return _label(args)
     if args.cmd == "export-dataset":
         return _export(args)
+    if args.cmd == "train":
+        return _train(args)
     if args.cmd == "review":
         return _review(args)
     if args.cmd == "triage":
@@ -143,7 +152,7 @@ def _daemon(args: argparse.Namespace) -> int:
         )
     if args.action == "start":
         try:
-            daemon_mod.start(host=host, port=port, device=args.device)
+            daemon_mod.start(host=host, port=port, device=args.device, model=config.laya.model)
         except daemon_mod.DaemonError as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -194,6 +203,43 @@ def _calibrate(args: argparse.Namespace) -> int:
     result = calibrate_from_traces(list(iter_traces()), load_labels())
     json.dump(result, sys.stdout, indent=2)
     sys.stdout.write("\n")
+    return 0
+
+
+def _train(args: argparse.Namespace) -> int:
+    import time
+
+    from lgh.daemon import laya_installed
+    from lgh.daemon.server import MODEL_ID
+    from lgh.paths import user_data_dir
+    from lgh.train.data import DatasetError
+
+    if not laya_installed():
+        print("lgh train needs the Laya runtime: uv sync --extra dev --extra laya", file=sys.stderr)
+        return 1
+    output = args.output or user_data_dir() / "models" / time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    if output.exists():
+        print(f"{output} already exists; pick a new --output", file=sys.stderr)
+        return 1
+
+    from lgh.train.loop import TrainSettings
+    from lgh.train.runner import run_training, summary_table
+
+    try:
+        report = run_training(
+            args.dataset,
+            output,
+            base=args.base or MODEL_ID,
+            device=args.device,
+            settings=TrainSettings(epochs=args.epochs),
+        )
+    except DatasetError as exc:
+        print(f"dataset error: {exc}", file=sys.stderr)
+        return 1
+    print(summary_table(report))
+    print(f"checkpoint: {report['checkpoint']}")
+    print(f"report: {output / 'report.json'}")
+    print("To serve it, set laya.model to the checkpoint path in ~/.config/lgh/config.yaml and restart the daemon.")
     return 0
 
 

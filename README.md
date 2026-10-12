@@ -246,10 +246,38 @@ teacher:
 
 The API key is `OPENROUTER_API_KEY` in the environment, never in yaml. Missing model or key aborts before the UI listens.
 
+## Train
+
+Fine-tune Laya on your labels (needs the `laya` extra; a CUDA GPU is strongly recommended):
+
+```bash
+uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
+USE_TF=0 uv run lgh train --dataset /tmp/lgh-dataset.jsonl   # --epochs 4 --device cuda --base <id|dir>
+```
+
+Training minimizes log loss (a strictly proper scoring rule) against the human labels, so probabilities stay calibratable; `noul` labels are soft targets (`0.2` trains toward 20 %). The newest 20 % of rows by timestamp are held out for validation and early stopping. Afterwards one temperature per question type and option count is fitted on that split and written into the checkpoint.
+
+The checkpoint lands in `~/.local/share/lgh/models/<UTC time>/` in Laya's own layout, with `report.json` comparing the base and fine-tuned model on the validation split (accuracy, log loss, Brier, ECE, recall per class). Read the warnings first: a class with fewer than 10 training examples will not be learned, and a class with no validation examples cannot be measured. Rare `replan` / `escalate` / `outside_scope` / `irreversible` cases come from labeling `lgh triage` candidates, not from training longer.
+
+Serve it by pointing **user** config at the directory (a repo cannot change `laya.model`), then restart the daemon:
+
+```yaml
+laya:
+  model: /home/you/.local/share/lgh/models/20261012T120000Z
+  temperatures: {}   # the checkpoint carries its own; LGH temperatures would scale twice
+```
+
+```bash
+uv run lgh daemon stop && USE_TF=0 uv run lgh daemon start --device cuda
+uv run lgh daemon status   # health.model shows the checkpoint path
+```
+
+With systemd, add `--model <dir>` to `ExecStart`.
+
 ## Privacy
 
 Traces never store secret values, API keys, tokens, `.env` contents, private keys, authorization headers, full source files, or raw credentials. Sensitive targets are logged as metadata with `contentsLogged: false`. New traces also store a compact **redacted** `LayaState` (goal, plan, command, repo metadata) so a human can label the action later. That snapshot is the training input. `lgh review --propose` sends that redacted snapshot to OpenRouter; the API key stays in `OPENROUTER_API_KEY`.
 
 ## v0.1 non-goals
 
-No custom Laya checkpoint, no autonomous policy learning, no Codex parity, no desktop/cloud console, no cloud service, no automatic threshold optimization.
+No autonomous policy learning (training runs only when you run `lgh train`), no Codex parity, no desktop/cloud console, no cloud service, no automatic threshold optimization.

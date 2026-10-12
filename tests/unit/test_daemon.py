@@ -1,3 +1,4 @@
+import io
 import json
 from unittest.mock import patch
 
@@ -83,3 +84,38 @@ def test_read_health_parses_json() -> None:
     with patch("urllib.request.urlopen", return_value=Resp()):
         health = _read_health("127.0.0.1", 8765)
     assert health == {"ok": True, "loading": False}
+
+
+def _start_with_spawn_captured(**kwargs) -> list[str]:
+    proc = type("Proc", (), {"pid": 4242, "poll": lambda self: None})()
+    with (
+        patch("lgh.daemon.laya_installed", return_value=True),
+        patch("lgh.daemon.is_running", return_value=False),
+        patch("lgh.daemon._read_health", side_effect=[None, {"ok": True}]),
+        patch("lgh.daemon._port_open", return_value=False),
+        patch("lgh.daemon.subprocess.Popen", return_value=proc) as popen,
+        patch("lgh.daemon.daemon_pid_path") as pid_path,
+        patch("lgh.daemon.daemon_log_path") as log_path,
+        patch("lgh.daemon.user_state_dir"),
+    ):
+        log_path.return_value.open.return_value = io.StringIO()
+        start(**kwargs)
+    return popen.call_args.args[0]
+
+
+def test_start_passes_configured_model_to_daemon() -> None:
+    argv = _start_with_spawn_captured(model="/models/lgh-ft")
+    assert argv[argv.index("--model") + 1] == "/models/lgh-ft"
+
+
+def test_start_refuses_running_daemon_with_other_model() -> None:
+    with (
+        patch("lgh.daemon.is_running", return_value=True),
+        patch("lgh.daemon._read_health", return_value={"ok": True, "model": "convaiinnovations/laya-typed-decisions"}),
+    ):
+        try:
+            start(model="/models/lgh-ft")
+        except DaemonError as exc:
+            assert "lgh daemon stop" in str(exc)
+        else:
+            raise AssertionError("expected DaemonError")

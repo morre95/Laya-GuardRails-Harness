@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from lgh.config.models import GuardrailConfig
+from lgh.laya.client import state_payload
 from lgh.laya.questions import load_questions
 from lgh.schema.envelope import ActionEnvelope
 from lgh.schema.trace import DecisionTrace
@@ -15,11 +16,11 @@ def _state_payload(
     envelopes: dict[str, ActionEnvelope] | None,
 ) -> dict | None:
     if trace.state is not None:
-        return trace.state.model_dump(mode="json")
+        return state_payload(trace.state)
     envelope = (envelopes or {}).get(trace.trace_id)
     if envelope is None:
         return None
-    return build_laya_state(envelope, GuardrailConfig()).model_dump(mode="json")
+    return state_payload(build_laya_state(envelope, GuardrailConfig()))
 
 
 def export_dataset(
@@ -46,6 +47,8 @@ def export_dataset(
             continue
         rows.append(
             {
+                "trace_id": trace.trace_id,
+                "timestamp": trace.timestamp,
                 "state": state,
                 "questions": questions,
                 "labels": {
