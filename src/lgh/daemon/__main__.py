@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from lgh.daemon.server import serve
+from lgh.daemon.server import MODEL_ID, serve
 
 
 def main() -> None:
@@ -14,9 +14,16 @@ def main() -> None:
         default="cpu",
         help="torch device (cpu, cuda). 'gpu' is an alias for cuda.",
     )
+    parser.add_argument("--model", default=MODEL_ID, help="Hugging Face id or local checkpoint directory")
     parser.add_argument("--no-preload", action="store_true")
     args = parser.parse_args()
-    serve(host=args.host, port=args.port, preload=not args.no_preload, device=args.device)
+    serve(
+        host=args.host,
+        port=args.port,
+        preload=not args.no_preload,
+        device=args.device,
+        model=args.model,
+    )
 
 
 if __name__ == "__main__":

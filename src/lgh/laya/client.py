@@ -11,6 +11,11 @@ from lgh.schema.envelope import LayaState
 from lgh.schema.laya import LayaAssessment
 
 
+def state_payload(state: LayaState) -> dict[str, Any]:
+    """The state exactly as Laya sees it at inference. Training data must use the same form."""
+    return state.model_dump(mode="json", exclude_none=True)
+
+
 class LayaClient(Protocol):
     def assess(self, state: LayaState) -> LayaAssessment:
         ...
@@ -32,7 +37,7 @@ class HttpLayaClient:
 
     def assess(self, state: LayaState) -> LayaAssessment:
         payload = {
-            "state": state.model_dump(mode="json", exclude_none=True),
+            "state": state_payload(state),
             "questions": self.questions,
         }
         request = urllib.request.Request(

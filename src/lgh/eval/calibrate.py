@@ -6,7 +6,7 @@ from collections import defaultdict
 from lgh.schema.trace import DecisionTrace
 
 
-def _ece(probs: list[float], labels: list[int], bins: int = 10) -> float:
+def ece(probs: list[float], labels: list[int], bins: int = 10) -> float:
     if not probs:
         return 0.0
     total = 0.0
@@ -24,7 +24,7 @@ def _ece(probs: list[float], labels: list[int], bins: int = 10) -> float:
     return total
 
 
-def _brier(probs: list[float], labels: list[int]) -> float:
+def brier(probs: list[float], labels: list[int]) -> float:
     if not probs:
         return 0.0
     return sum((p - y) ** 2 for p, y in zip(probs, labels, strict=False)) / len(probs)
@@ -36,7 +36,7 @@ def fit_temperature(probs: list[float], labels: list[int]) -> float:
     for step in range(1, 51):
         t = step / 10.0
         scaled = [_scale(p, t) for p in probs]
-        score = _brier(scaled, labels)
+        score = brier(scaled, labels)
         if score < best:
             best = score
             best_t = t
@@ -88,8 +88,8 @@ def calibrate_from_traces(traces: list[DecisionTrace], labels: list[dict]) -> di
     temperatures: dict[str, float] = {}
     for key, (probs, ys) in by_key.items():
         report[key] = {
-            "ece": _ece(probs, ys),
-            "brier": _brier(probs, ys),
+            "ece": ece(probs, ys),
+            "brier": brier(probs, ys),
             "n": len(probs),
         }
         kind = key.split("_", 1)[0]

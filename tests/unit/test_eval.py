@@ -66,7 +66,7 @@ def test_export_skips_laya_source(tmp_path) -> None:
 def test_export_uses_stored_state_and_seven_labels(tmp_path) -> None:
     from lgh.config.models import GuardrailConfig
     from lgh.eval.labels import append_label
-    from lgh.laya.client import FakeLayaClient
+    from lgh.laya.client import FakeLayaClient, state_payload
     from lgh.pipeline import Pipeline
     from lgh.schema.laya import HandlingAssessment, LayaAssessment, ReversibilityAssessment, TaskAlignmentAssessment
     from lgh.session.store import SessionStore
@@ -114,6 +114,11 @@ def test_export_uses_stored_state_and_seven_labels(tmp_path) -> None:
     assert rows[0]["state"]["action"]["command"] == "pytest"
     assert rows[0]["state"]["goal"] == "run tests"
     assert rows[0]["labels"]["handling"] == "verify"
+    assert rows[0]["trace_id"] == result.trace.trace_id
+    assert rows[0]["timestamp"] == result.trace.timestamp
+    # Same serialization as the daemon request, or training sees different tokens than inference.
+    assert rows[0]["state"] == state_payload(result.trace.state)
+    assert None not in rows[0]["state"].values()
     assert rows[0]["labels"]["sensitive_resource"] == 0.0
     assert set(rows[0]["labels"]) == {
         "task_alignment",

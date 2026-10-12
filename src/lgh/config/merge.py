@@ -40,8 +40,8 @@ def merge_configs(user: GuardrailConfig, repo: GuardrailConfig) -> GuardrailConf
     merged.protected_paths = _union(user.protected_paths, repo.protected_paths)
     merged.protected_branches = _union(user.protected_branches, repo.protected_branches)
     merged.laya.thresholds = _stricter_thresholds(user.laya.thresholds, repo.laya.thresholds)
-    if repo.laya.model:
-        merged.laya.model = repo.laya.model
+    # The daemon loads laya.model, which may be a local checkpoint path. A repo
+    # cannot point it at code of its choosing, so the model comes from the user.
     merged.laya.temperatures = {**repo.laya.temperatures, **user.laya.temperatures}
     merged.review.frontier_enabled = user.review.frontier_enabled or repo.review.frontier_enabled
     # Teacher credentials/model live on the user machine. A repo cannot retarget

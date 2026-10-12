@@ -127,11 +127,17 @@ class Handler(BaseHTTPRequestHandler):
             )
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765, preload: bool = True, device: str = "cpu") -> None:
+def serve(
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    preload: bool = True,
+    device: str = "cpu",
+    model: str = MODEL_ID,
+) -> None:
     if preload:
         threading.Thread(
             target=_preload,
-            kwargs={"device": device},
+            kwargs={"model": model, "device": device},
             name="lgh-laya-load",
             daemon=True,
         ).start()
@@ -139,8 +145,8 @@ def serve(host: str = "127.0.0.1", port: int = 8765, preload: bool = True, devic
     httpd.serve_forever()
 
 
-def _preload(device: str = "cpu") -> None:
+def _preload(model: str = MODEL_ID, device: str = "cpu") -> None:
     try:
-        load_agent(device=device)
+        load_agent(model=model, device=device)
     except Exception:
         traceback.print_exc()
