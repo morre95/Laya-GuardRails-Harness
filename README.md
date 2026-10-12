@@ -252,7 +252,7 @@ Fine-tune Laya on your labels (needs the `laya` extra; a CUDA GPU is strongly re
 
 ```bash
 uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
-USE_TF=0 uv run lgh train --dataset /tmp/lgh-dataset.jsonl   # --epochs 4 --device cuda --base <id|dir>
+USE_TF=0 uv run laya lgh train --dataset /tmp/lgh-dataset.jsonl --epochs 4 --device cuda
 ```
 
 Training minimizes log loss (a strictly proper scoring rule) against the human labels, so probabilities stay calibratable; `noul` labels are soft targets (`0.2` trains toward 20 %). The newest 20 % of rows by timestamp are held out for validation and early stopping. Afterwards one temperature per question type and option count is fitted on that split and written into the checkpoint.
