@@ -1,0 +1,478 @@
+{
+  "traces": {
+    "traces": 2900,
+    "first_day": "2026-09-20",
+    "last_day": "2026-10-17",
+    "days": 22,
+    "assessments": 2296,
+    "latency_ms": {
+      "p50": 99.74200199997085,
+      "p95": 169.22601699843653,
+      "min": 33.20093900038046
+    }
+  },
+  "labels": {
+    "total": 1331,
+    "sources": {
+      "human": 1331
+    },
+    "distribution": {
+      "task_alignment": {
+        "aligned": 201,
+        "supporting": 688,
+        "unclear": 440,
+        "outside_scope": 2
+      },
+      "destructive_risk": {
+        "false": 1298,
+        "true": 33
+      },
+      "sensitive_resource": {
+        "false": 1281,
+        "true": 50
+      },
+      "external_impact": {
+        "false": 1299,
+        "true": 32
+      },
+      "reversibility": {
+        "trivial": 1081,
+        "recoverable": 233,
+        "difficult": 16,
+        "irreversible": 1
+      },
+      "verification_needed": {
+        "false": 1021,
+        "true": 310
+      },
+      "handling": {
+        "allow": 1018,
+        "verify": 309,
+        "replan": 3,
+        "escalate": 1
+      }
+    }
+  },
+  "training": {
+    "checkpoint": "20261012T163824Z",
+    "base": "convaiinnovations/laya-typed-decisions",
+    "trained_at": "2026-10-12T16:59:31.231Z",
+    "rows": {
+      "train": 1065,
+      "val": 266
+    },
+    "settings": {
+      "epochs": 4,
+      "lr_encoder": 1e-05,
+      "lr_head": 0.0001,
+      "grad_accumulation": 8,
+      "patience": 1,
+      "seed": 0
+    },
+    "support": {
+      "train": {
+        "task_alignment": {
+          "aligned": 177,
+          "supporting": 580,
+          "unclear": 308,
+          "outside_scope": 0
+        },
+        "destructive_risk": {
+          "false": 1037,
+          "true": 28
+        },
+        "sensitive_resource": {
+          "false": 1020,
+          "true": 45
+        },
+        "external_impact": {
+          "false": 1041,
+          "true": 24
+        },
+        "reversibility": {
+          "trivial": 867,
+          "recoverable": 186,
+          "difficult": 11,
+          "irreversible": 1
+        },
+        "verification_needed": {
+          "false": 856,
+          "true": 209
+        },
+        "handling": {
+          "allow": 854,
+          "verify": 209,
+          "replan": 1,
+          "escalate": 1
+        }
+      },
+      "val": {
+        "task_alignment": {
+          "aligned": 24,
+          "supporting": 108,
+          "unclear": 132,
+          "outside_scope": 2
+        },
+        "destructive_risk": {
+          "false": 261,
+          "true": 5
+        },
+        "sensitive_resource": {
+          "false": 261,
+          "true": 5
+        },
+        "external_impact": {
+          "false": 258,
+          "true": 8
+        },
+        "reversibility": {
+          "trivial": 214,
+          "recoverable": 47,
+          "difficult": 5,
+          "irreversible": 0
+        },
+        "verification_needed": {
+          "false": 165,
+          "true": 101
+        },
+        "handling": {
+          "allow": 164,
+          "verify": 100,
+          "replan": 2,
+          "escalate": 0
+        }
+      }
+    },
+    "warnings": [
+      "task_alignment=outside_scope: 0 training examples (< 10); expect it not to be learned",
+      "reversibility=irreversible: 1 training examples (< 10); expect it not to be learned",
+      "reversibility=irreversible: no validation examples; its accuracy cannot be measured",
+      "handling=replan: 1 training examples (< 10); expect it not to be learned",
+      "handling=escalate: 1 training examples (< 10); expect it not to be learned",
+      "handling=escalate: no validation examples; its accuracy cannot be measured"
+    ],
+    "history": [
+      {
+        "epoch": 0,
+        "val_loss": 1.043507004142704
+      },
+      {
+        "epoch": 1,
+        "train_loss": 0.4652073754076387,
+        "val_loss": 0.5348852871167928
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.3687345253364861,
+        "val_loss": 0.5503346116415092
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.28989898842003003,
+        "val_loss": 0.5736712969671515
+      }
+    ],
+    "temperatures": {
+      "choice:3-5": 1.4,
+      "noul:2": 1.05
+    },
+    "metrics": {
+      "base": {
+        "task_alignment": {
+          "accuracy": 0.13533834586466165,
+          "log_loss": 1.4415360885348831,
+          "recall": {
+            "aligned": {
+              "support": 24,
+              "correct": 12
+            },
+            "supporting": {
+              "support": 108,
+              "correct": 12
+            },
+            "unclear": {
+              "support": 132,
+              "correct": 11
+            },
+            "outside_scope": {
+              "support": 2,
+              "correct": 1
+            }
+          }
+        },
+        "destructive_risk": {
+          "accuracy": 0.9135338345864662,
+          "log_loss": 0.5298217033796911,
+          "recall": {
+            "false": {
+              "support": 261,
+              "correct": 243
+            },
+            "true": {
+              "support": 5,
+              "correct": 0
+            }
+          }
+        },
+        "sensitive_resource": {
+          "accuracy": 0.6654135338345865,
+          "log_loss": 0.6618776835486608,
+          "recall": {
+            "false": {
+              "support": 261,
+              "correct": 177
+            },
+            "true": {
+              "support": 5,
+              "correct": 0
+            }
+          }
+        },
+        "external_impact": {
+          "accuracy": 0.41729323308270677,
+          "log_loss": 0.7511222536852165,
+          "recall": {
+            "false": {
+              "support": 258,
+              "correct": 106
+            },
+            "true": {
+              "support": 8,
+              "correct": 5
+            }
+          }
+        },
+        "reversibility": {
+          "accuracy": 0.17293233082706766,
+          "log_loss": 1.4850302244581413,
+          "recall": {
+            "trivial": {
+              "support": 214,
+              "correct": 31
+            },
+            "recoverable": {
+              "support": 47,
+              "correct": 14
+            },
+            "difficult": {
+              "support": 5,
+              "correct": 1
+            },
+            "irreversible": {
+              "support": 0,
+              "correct": 0
+            }
+          }
+        },
+        "verification_needed": {
+          "accuracy": 0.48120300751879697,
+          "log_loss": 0.7318842302130486,
+          "recall": {
+            "false": {
+              "support": 165,
+              "correct": 35
+            },
+            "true": {
+              "support": 101,
+              "correct": 93
+            }
+          }
+        },
+        "handling": {
+          "accuracy": 0.2706766917293233,
+          "log_loss": 1.450601730905701,
+          "recall": {
+            "allow": {
+              "support": 164,
+              "correct": 17
+            },
+            "verify": {
+              "support": 100,
+              "correct": 53
+            },
+            "replan": {
+              "support": 2,
+              "correct": 2
+            },
+            "escalate": {
+              "support": 0,
+              "correct": 0
+            }
+          }
+        }
+      },
+      "fine_tuned": {
+        "task_alignment": {
+          "accuracy": 0.44360902255639095,
+          "log_loss": 1.1166023157509946,
+          "recall": {
+            "aligned": {
+              "support": 24,
+              "correct": 2
+            },
+            "supporting": {
+              "support": 108,
+              "correct": 82
+            },
+            "unclear": {
+              "support": 132,
+              "correct": 34
+            },
+            "outside_scope": {
+              "support": 2,
+              "correct": 0
+            }
+          }
+        },
+        "destructive_risk": {
+          "accuracy": 0.981203007518797,
+          "log_loss": 0.24528671195969967,
+          "recall": {
+            "false": {
+              "support": 261,
+              "correct": 261
+            },
+            "true": {
+              "support": 5,
+              "correct": 0
+            }
+          }
+        },
+        "sensitive_resource": {
+          "accuracy": 0.981203007518797,
+          "log_loss": 0.1916616245904886,
+          "recall": {
+            "false": {
+              "support": 261,
+              "correct": 261
+            },
+            "true": {
+              "support": 5,
+              "correct": 0
+            }
+          }
+        },
+        "external_impact": {
+          "accuracy": 0.9699248120300752,
+          "log_loss": 0.14195366836080772,
+          "recall": {
+            "false": {
+              "support": 258,
+              "correct": 258
+            },
+            "true": {
+              "support": 8,
+              "correct": 0
+            }
+          }
+        },
+        "reversibility": {
+          "accuracy": 0.8157894736842105,
+          "log_loss": 0.5659711697398845,
+          "recall": {
+            "trivial": {
+              "support": 214,
+              "correct": 207
+            },
+            "recoverable": {
+              "support": 47,
+              "correct": 10
+            },
+            "difficult": {
+              "support": 5,
+              "correct": 0
+            },
+            "irreversible": {
+              "support": 0,
+              "correct": 0
+            }
+          }
+        },
+        "verification_needed": {
+          "accuracy": 0.6541353383458647,
+          "log_loss": 0.6678337041499491,
+          "recall": {
+            "false": {
+              "support": 165,
+              "correct": 163
+            },
+            "true": {
+              "support": 101,
+              "correct": 11
+            }
+          }
+        },
+        "handling": {
+          "accuracy": 0.6541353383458647,
+          "log_loss": 0.7234832655510918,
+          "recall": {
+            "allow": {
+              "support": 164,
+              "correct": 149
+            },
+            "verify": {
+              "support": 100,
+              "correct": 25
+            },
+            "replan": {
+              "support": 2,
+              "correct": 0
+            },
+            "escalate": {
+              "support": 0,
+              "correct": 0
+            }
+          }
+        }
+      }
+    },
+    "model": {
+      "encoder": "answerdotai/ModernBERT-large",
+      "head_layers": 2,
+      "max_len": 1024,
+      "head_max_len": 256,
+      "parameters": 421293830
+    }
+  },
+  "comparison": {
+    "directory": "20261017-unseen",
+    "rows": 9,
+    "mode": "unlabeled",
+    "audit": "no_exact_overlap",
+    "matches_checkpoint": true,
+    "paired": {
+      "task_alignment": {
+        "disagreements": 8
+      },
+      "destructive_risk": {
+        "disagreements": 1
+      },
+      "sensitive_resource": {
+        "disagreements": 0
+      },
+      "external_impact": {
+        "disagreements": 6
+      },
+      "reversibility": {
+        "disagreements": 8
+      },
+      "verification_needed": {
+        "disagreements": 6
+      },
+      "handling": {
+        "disagreements": 9
+      }
+    },
+    "handling": {
+      "base": {
+        "verify": 4,
+        "replan": 3,
+        "escalate": 2
+      },
+      "fine_tuned": {
+        "allow": 9
+      }
+    },
+    "metrics": null
+  }
+}
