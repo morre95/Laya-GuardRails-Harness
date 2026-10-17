@@ -36,6 +36,17 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--fixtures", type=Path, default=None)
     ev.add_argument("--with-laya", action="store_true")
 
+    compare = sub.add_parser("compare", help="Compare two checkpoints on a frozen dataset (no training)")
+    compare.add_argument("--dataset", type=Path, required=True)
+    compare.add_argument("--trained", type=Path, required=True, help="fine-tuned checkpoint directory")
+    compare.add_argument("--output", type=Path, required=True, help="new directory for frozen inputs and reports")
+    compare.add_argument("--training-dataset", type=Path, help="original full export, including validation rows")
+    compare.add_argument("--base", help="default: base recorded in the trained checkpoint")
+    compare.add_argument("--device", default="cpu")
+    compare.add_argument("--labels", type=Path, help="labels.jsonl overrides, joined by trace_id")
+    compare.add_argument("--unlabeled", action="store_true", help="compare predictions without accuracy claims")
+    compare.add_argument("--allow-overlap", action="store_true", help="explicitly allow exploratory/reused data")
+
     cal = sub.add_parser("calibrate", help="Fit temperatures from labeled traces")
     cal.add_argument("--output", type=Path, default=None)
 
@@ -103,6 +114,8 @@ def main(argv: list[str] | None = None) -> int:
         return _install(args)
     if args.cmd == "eval":
         return _eval(args)
+    if args.cmd == "compare":
+        return _compare(args)
     if args.cmd == "calibrate":
         return _calibrate(args)
     if args.cmd == "label":
@@ -192,6 +205,24 @@ def _eval(args: argparse.Namespace) -> int:
     sys.stdout.write("\n")
     if not summary.get("ok"):
         return 1
+    return 0
+
+
+def _compare(args: argparse.Namespace) -> int:
+    from lgh.eval.compare import run_comparison
+    from lgh.train.data import DatasetError
+
+    try:
+        report = run_comparison(
+            args.dataset, args.trained, args.output, training_dataset=args.training_dataset,
+            base=args.base, device=args.device, labels=args.labels,
+            unlabeled=args.unlabeled, allow_overlap=args.allow_overlap,
+        )
+    except (DatasetError, OSError, ValueError, KeyError, ImportError) as exc:
+        print(f"comparison error: {exc}", file=sys.stderr)
+        return 1
+    print(f"{report['rows']} rows; data audit: {report['audit']['status']}")
+    print(f"report: {args.output / 'report.md'}")
     return 0
 
 

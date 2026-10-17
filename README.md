@@ -307,6 +307,59 @@ uv run lgh daemon status   # health.model shows the checkpoint path
 
 With systemd, add `--model <dir>` to `ExecStart`.
 
+## Fristående modelljämförelse
+
+`lgh compare` kör två befintliga checkpoints på exakt samma frysta indata. Ingen
+träning, temperaturanpassning eller ändring av daemonen sker. Kommandon i
+testfallen behandlas som text och körs aldrig.
+
+```bash
+USE_TF=0 uv run --extra laya lgh compare \
+  --dataset ./testdata.jsonl \
+  --trained /path/to/your/trained/model \
+  --training-dataset ./original-training-export.jsonl \
+  --output ./comparisons/test-01 \
+  --device cpu
+```
+
+`--dataset` har samma format som `lgh export-dataset`. Basmodellen väljs från den
+tränade checkpointens metadata; `--base` kan ange en annan modell. Båda använder
+sin sparade kalibrering. Modellerna laddas efter varandra för att begränsa
+minnesanvändningen. `--device cuda` kan användas när CUDA finns.
+
+`--training-dataset` ska vara hela originalexporten, inklusive valideringsraderna.
+Kontrollsumman måste matcha checkpointens träningsmetadata. Testet avvisar
+återanvända trace-ID:n och identiska tillstånd, även om ID eller frågor har bytts.
+Utan verifierbar träningsdata avvisas körningen också. `--allow-overlap` tillåter
+en uttryckligen explorativ jämförelse och markerar rapporten därefter. Kontrollen
+upptäcker inte snarlika fall, gemensamma sessioner eller data från tidigare
+finjusteringar. Välj därför nya sessioner och håll testet utanför framtida träning
+så länge det används för att välja modell.
+
+För nya fall som ännu inte etiketterats används `--unlabeled`. Då visas skillnader
+i modellernas svar, men ingen träffsäkerhet eller risk-recall. Filen behöver
+`trace_id`, `timestamp`, `state` och `questions`; `labels` kan saknas. Etikettera
+utan att först läsa modellernas svar. Kör därefter om till en ny resultatkatalog
+utan `--unlabeled`, med `--labels ~/.local/share/lgh/labels.jsonl` för att hämta
+de senaste referensetiketterna per trace-ID. Alla testfall måste vara etiketterade;
+saknade etiketter utesluts inte tyst.
+
+Resultatkatalogen innehåller:
+
+- `dataset.jsonl`: de faktiska frysta indata och referenser som användes.
+- `report.md` och `report.json`: träffsäkerhet, majoritetsbaseline, log loss,
+  Brier, ECE, balanserad träffsäkerhet, förväxlingsmatriser och recall per klass.
+  `handling.intervention` visar missade behov av ingripande och onödiga ingripanden.
+- `predictions.jsonl`: båda modellernas sannolikheter per testfall.
+- `disagreements.jsonl`: olika klassval, med förbättringar/försämringar i rapporten
+  när referenser finns.
+
+Kontrollsummor för dataset, vikter och modellkonfiguration sparas i rapporten.
+Saknade klasser redovisas som omätbara; små klasser får varningar. Måtten gäller
+Layas bedömningar, inte slutbesluten från hela regel- och policykedjan.
+Resultatkataloger under `comparisons/` är git-ignorerade eftersom de kan innehålla
+lokalt insamlad kontext.
+
 ## Privacy
 
 Traces never store secret values, API keys, tokens, `.env` contents, private keys, authorization headers, full source files, or raw credentials. Sensitive targets are logged as metadata with `contentsLogged: false`. New traces also store a compact **redacted** `LayaState` (goal, plan, command, repo metadata) so a human can label the action later. That snapshot is the training input. `lgh review --propose` sends that redacted snapshot to OpenRouter; the API key stays in `OPENROUTER_API_KEY`.
