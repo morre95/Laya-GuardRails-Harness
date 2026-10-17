@@ -1,0 +1,4 @@
+# @comark/markdown-it requires markdown-it ^14 (its token import path is gone in 15),
+# but Shiki pulls in 15 and pnpm otherwise hands that version to comark too.
+overrides:
+  "@comark/markdown-it>markdown-it": "14.1.0"
