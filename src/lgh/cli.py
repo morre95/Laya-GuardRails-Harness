@@ -47,6 +47,19 @@ def main(argv: list[str] | None = None) -> int:
     compare.add_argument("--unlabeled", action="store_true", help="compare predictions without accuracy claims")
     compare.add_argument("--allow-overlap", action="store_true", help="explicitly allow exploratory/reused data")
 
+    backends = sub.add_parser("compare-backends", help="Collect one model pass or combine offline Laya/Kev passes")
+    backends.add_argument("--dataset", type=Path)
+    backends.add_argument("--replay", type=Path, help="frozen rule/context/reference JSONL sidecar")
+    backends.add_argument("--experiment", type=Path, help="frozen policy and backend identity JSON")
+    backends.add_argument("--backend", choices=["laya_current", "kev", "laya_released"])
+    backends.add_argument("--runs", nargs="+", type=Path, help="combine completed per-backend directories")
+    backends.add_argument("--snapshot", action="store_true", help="write a read-only current-config experiment template")
+    backends.add_argument("--output", type=Path, required=True, help="new output directory")
+    backends.add_argument("--labels", type=Path)
+    backends.add_argument("--unlabeled", action="store_true")
+    backends.add_argument("--allow-overlap", action="store_true", help="explicit exploratory audit override")
+    backends.add_argument("--timeout", type=float, default=30)
+
     cal = sub.add_parser("calibrate", help="Fit temperatures from labeled traces")
     cal.add_argument("--output", type=Path, default=None)
 
@@ -116,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
         return _eval(args)
     if args.cmd == "compare":
         return _compare(args)
+    if args.cmd == "compare-backends":
+        return _compare_backends(args)
     if args.cmd == "calibrate":
         return _calibrate(args)
     if args.cmd == "label":
@@ -223,6 +238,37 @@ def _compare(args: argparse.Namespace) -> int:
         return 1
     print(f"{report['rows']} rows; data audit: {report['audit']['status']}")
     print(f"report: {args.output / 'report.md'}")
+    return 0
+
+
+def _compare_backends(args: argparse.Namespace) -> int:
+    from lgh.eval.compare_backends import collect_backend, combine_runs
+
+    try:
+        if args.snapshot:
+            if any((args.dataset, args.replay, args.experiment, args.backend, args.runs, args.labels,
+                    args.unlabeled, args.allow_overlap)):
+                raise ValueError("--snapshot cannot be combined with collection or report options")
+            from lgh.eval.backend_setup import snapshot_experiment
+
+            snapshot_experiment(args.output, cwd=Path.cwd())
+            print(f"review and complete the experiment template: {args.output / 'experiment.json'}")
+        elif args.runs:
+            if any((args.dataset, args.replay, args.experiment, args.backend, args.labels,
+                    args.unlabeled, args.allow_overlap)):
+                raise ValueError("--runs cannot be combined with collection options")
+            result = combine_runs(args.runs, args.output)
+            print(f"report: {args.output / 'report.md'}; selection: {result['selection']['status']}")
+        else:
+            if not all((args.dataset, args.replay, args.experiment, args.backend)):
+                raise ValueError("collection requires --dataset, --replay, --experiment and --backend")
+            result = collect_backend(args.dataset, args.replay, args.experiment, args.backend,
+                                     args.output, labels=args.labels, unlabeled=args.unlabeled,
+                                     allow_overlap=args.allow_overlap, timeout=args.timeout)
+            print(f"collected {result['sample_count']} samples: {args.output}")
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"backend comparison error: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 
