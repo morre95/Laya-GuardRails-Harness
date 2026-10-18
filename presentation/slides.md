@@ -35,7 +35,7 @@ hur jag samlade in data och finjusterade den, och till sist en live-demo.
 <div class="grid grid-cols-2 gap-6 mt-6">
 <div class="card">
 <div class="kicker">Användarens mål</div>
-<p class="text-lg! mt-1">”Fixa bygget som inte går igenom”</p>
+<p class="text-lg! mt-1">”Fix the build that don't go through”</p>
 <div class="kicker mt-4">Agentens nästa steg</div>
 <pre class="mono text-xl mt-1 text-[var(--ink-1)]">rm -rf build/</pre>
 </div>
@@ -56,29 +56,95 @@ Ingen människa orkar godkänna tusentals kommandon. Därför behövs något aut
 
 # Kedjan: regler först, Laya sedan
 
-```mermaid {scale: 0.62}
+<script setup>
+import { metrics, formatPercent } from './data'
+const thresholds = metrics.laya_config.thresholds
+</script>
+
+```mermaid {scale: 0.58}
 flowchart LR
-  A[Agentens kommando] --> R{Hårda regler}
+  A[Agentens handling] --> R{Hårda regler}
   R -- känt farligt --> H[Människa / blockera]
   R -- känt säkert --> OK[Kör]
   R -- okänt --> L[Laya<br/>7 frågor]
   L --> P{Policy<br/>trösklar}
   P -- säkert nog --> OK
-  P -- osäkert --> F[Frontier-LLM<br/>granskar]
-  F --> H
+  P -- osäkert --> F[Frontier-LLM]
+  P -- verifiera --> V[Skill till kodagenten<br/>kontrollera och försök igen]
+  F -- tillåt --> OK
+  F -- verifiera --> V
+  F -- avslå / eskalera --> H
 ```
 
 <div class="grid grid-cols-3 gap-4 mt-4">
-<div class="card"><h3>Hårda regler</h3><p>Mönster som <code>git push --force</code> eller läsning av <code>.env</code>. Snabba, förutsägbara och omöjliga att lura med formuleringar.</p></div>
+<div class="card"><h3>Hårda regler</h3><p>Mönster som <code>git push --force</code>, <code>rm -rf /</code> eller läsning av <code>.env</code>. Snabba och förutsägbara kontroller.</p></div>
 <div class="card"><h3>Laya är en sensor</h3><p>Den mäter risk med sannolikheter. Den blockerar aldrig själv. Blockering kommer bara från regler eller policy.</p></div>
-<div class="card"><h3>Shadow-läge</h3><p>Allt bedöms och loggas, men inget stoppas. Det är så datan till finjusteringen samlades in.</p></div>
+<div class="card"><h3>Policytrösklar</h3><p>Destruktiv risk ≥ <strong>{{ formatPercent(thresholds.destructive) }}</strong> eller säkerhet i hanteringen &lt; <strong>{{ formatPercent(thresholds.confidence) }}</strong> → granskare.<br>Kontrollbehov ≥ <strong>{{ formatPercent(thresholds.verification) }}</strong> → verifiera först.</p></div>
 </div>
 
 <!--
 Ordningen är viktig. Först kommer hårda regler, vanlig kod som känner igen kända mönster.
 Det regler inte känner igen skickas till Laya. Laya svarar på sju frågor och ger sannolikheter.
-Policyn jämför dem med trösklar. Är Laya osäker skickas fallet vidare uppåt, till en stor språkmodell eller en människa.
+Policyn är vanlig kod som jämför svaren med konfigurerade trösklar, inte en modell som lär sig egna gränser.
+Kortet visar destruktiv risk som exempel. Även känsliga resurser och extern påverkan har egna risktrösklar.
+Säkerhet i hanteringen betyder sannolikheten för Layas valda hanteringsalternativ, till exempel allow.
+Ett värde under gränsen skickar fallet till frontier-granskaren även om Laya föreslår allow.
+Hög risk kontrolleras före kontrollbehov. Andra svar kan också kräva granskning eller omplanering; diagrammet visar huvudvägarna.
+Frontier-granskaren kan tillåta, kräva verifiering, begära omplanering, kräva människa eller blockera.
+Verifiering kan alltså väljas direkt av policyn eller efter frontier-granskning. Nästa bild visar vad som händer då.
 Laya kan alltså aldrig ensam säga "blockera". Den är en sensor, inte en domare.
+Flödet beskriver enforce-läge. I shadow-läge loggas besluten utan att stoppa handlingen; frontier-anrop hoppas normalt över.
+Källor: src/lgh/policy/reducer.py, src/lgh/pipeline.py, src/lgh/frontier/base.py och presentation/data/metrics.json.
+-->
+
+---
+
+# Databasmigrering: verifiera före körning
+
+Illustrativt exempel i enforce-läge: agenten vill migrera en utvecklingsdatabas.
+
+```mermaid {scale: 0.76}
+flowchart LR
+  P[Policy eller frontier<br/>säger verifiera] --> S[Systemet väljer<br/>database-safety]
+  S --> A[Kodagenten får<br/>checklistan]
+  A --> R[Kontrollera och försök igen<br/>ny bedömning]
+```
+
+<div class="grid grid-cols-[1.2fr_1fr] gap-6 mt-5">
+<div class="card">
+<h3>Skillens checklista</h3>
+<ol class="my-2! pl-5!">
+<li>Identifiera vilken miljö databasen tillhör.</li>
+<li>Granska den genererade migreringen.</li>
+<li>Gör en dry-run om det stöds.</li>
+<li>Fastställ hur ändringen kan återställas.</li>
+</ol>
+</div>
+<div class="card">
+<h3>Instruktioner till kodagenten</h3>
+<p>Frontier-LLM granskar handlingen. Systemet väljer skillen och skickar checklistan till den arbetande kodagenten.</p>
+<p>Verktygsanropet stoppas tills vidare. Agenten uppmanas att göra kontrollerna och sedan försöka igen.</p>
+</div>
+</div>
+
+<p class="text-sm mt-4"><strong>Verifiering ger inget automatiskt godkännande. Nästa försök bedöms på nytt.</strong></p>
+
+<!--
+Det här är ett illustrativt flöde, inte ett uppmätt modellresultat. Vi antar att handlingen gäller en utvecklingsdatabas,
+att de hårda reglerna släpper den vidare och att policyn eller frontier-granskaren beslutar VERIFY.
+En känd produktionsändring kan i stället kräva mänskligt godkännande direkt via de hårda reglerna.
+Systemet känner igen en databasoperation eller ett migreringskommando och väljer database-safety med vanlig kod.
+Det injiceras ingen verifieringsskill i frontier-granskarens prompt. Den får målet, handlingen, miljön, senaste handlingarna,
+matchade regler och Layas bedömning. Den instrueras att klassificera handlingen utan att köra verktyg.
+Frontier-svaret kan innehålla verificationSkill, men det fältet styr inte skillvalet i den nuvarande implementationen.
+När beslutet blir ALLOW_WITH_VERIFICATION skapar routern en instruktion med skillens namn och fyra krav.
+Hooken nekar det aktuella verktygsanropet och skickar instruktionen till den arbetande kodagenten.
+Checklistan kommer från routerns kod; hela skillens Markdown-fil laddas inte automatiskt in.
+Agenten uppmanas att utföra kontrollerna och försöka med samma handling igen. Det nya försöket går genom bedömningen på nytt.
+Systemet har ingen separat kvittens som automatiskt intygar att checklistan är klar. Upprepade verifieringskrav eskaleras.
+Detta gäller enforce-läge. Shadow-läge loggar besluten men skickar inte denna stoppinstruktion till agenten.
+Källor: src/lgh/verification/router.py, src/lgh/adapters/claude_code/hooks.py,
+src/lgh/pipeline.py, src/lgh/frontier/claude_cli.py och src/lgh/session/antiloop.py.
 -->
 
 ---
