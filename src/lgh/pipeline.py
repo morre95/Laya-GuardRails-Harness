@@ -90,7 +90,14 @@ class Pipeline:
     def _frontier_skipped(self) -> bool:
         return self.config.mode == Mode.SHADOW and not self.config.review.run_in_shadow
 
-    def evaluate(self, envelope: ActionEnvelope) -> EvaluationResult:
+    def evaluate(
+        self, envelope: ActionEnvelope, *,
+        frozen_state: LayaState | None = None, frozen_rules: RuleResult | None = None,
+    ) -> EvaluationResult:
+        # Offline evaluation supplies both snapshots to avoid host detection and
+        # filesystem-dependent rule path resolution. Normal callers are unchanged.
+        if (frozen_state is None) != (frozen_rules is None):
+            raise ValueError("frozen state and rules must be supplied together")
         error: str | None = None
         laya: LayaAssessment | None = None
         laya_error: str | None = None
@@ -103,9 +110,14 @@ class Pipeline:
         rules = RuleResult(matched=[], disposition=RuleDisposition.PASS)
         state: LayaState | None = None
         try:
-            envelope = apply_environment(envelope, self.config)
-            state = build_laya_state(envelope, self.config)
-            rules = evaluate_rules(envelope, self.config)
+            if frozen_state is None:
+                envelope = apply_environment(envelope, self.config)
+                state = build_laya_state(envelope, self.config)
+                rules = evaluate_rules(envelope, self.config)
+            else:
+                assert frozen_rules is not None
+                state = frozen_state
+                rules = frozen_rules
             if rules.disposition == RuleDisposition.PASS:
                 try:
                     laya = self.laya.assess(state)

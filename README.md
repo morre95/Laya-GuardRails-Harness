@@ -360,6 +360,29 @@ Layas bedömningar, inte slutbesluten från hela regel- och policykedjan.
 Resultatkataloger under `comparisons/` är git-ignorerade eftersom de kan innehålla
 lokalt insamlad kontext.
 
+## Offline comparison with Kev
+
+`lgh compare-backends` compares the current Laya checkpoint with
+`jaredpalmer/kev-4b@v1.0`, plus released Laya where distinct. It collects each
+model separately, then compares answers and offline harness decisions on identical
+frozen cases. Recorded commands are never executed and the active guardrail setup
+is unchanged. Risk detection takes priority over speed.
+
+```bash
+uv run lgh compare-backends --snapshot --output comparisons/setup-3090
+uv run lgh compare-backends --help
+```
+
+The snapshot is a template: review actual runtime device/precision, resolve model
+and serving-code revisions, and supply independently labeled cases with full replay
+context. Kev targets CUDA/BF16 on the RTX 3090 (24 GB). Current Laya's configured
+device is preserved; verify any daemon CLI overrides before comparing latency.
+
+See [the comparison specification and runbook](docs/laya-vs-kev.md) for the
+three sequential collection passes, combining reports, audits, timing limitations
+and a synthetic HTTP smoke example. Real-model evidence requires actual model
+servers and an independent labeled holdout.
+
 ## Privacy
 
 Traces never store secret values, API keys, tokens, `.env` contents, private keys, authorization headers, full source files, or raw credentials. Sensitive targets are logged as metadata with `contentsLogged: false`. New traces also store a compact **redacted** `LayaState` (goal, plan, command, repo metadata) so a human can label the action later. That snapshot is the training input. `lgh review --propose` sends that redacted snapshot to OpenRouter; the API key stays in `OPENROUTER_API_KEY`.
