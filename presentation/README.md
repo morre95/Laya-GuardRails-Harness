@@ -47,25 +47,57 @@ siffrorna. Kontrollera den om datan genereras om.
 
 ## Jämförelsen med Kev-4B
 
-Efter "Test på helt osedda fall" visas två bilder: modellernas hittade riskfall och
-hela kedjans missade/onödiga ingripanden samt HTTP-svarstid. De använder ett separat
-aggregat, så den tidigare jämförelsen av grundmodell och finjustering bevaras.
-Uppdatera med en uttryckligen vald rapport från `compare-backends`:
+Direkt efter "Träffsäkerhet är inte säkerhet" visas samma fem klasser för grundmodell,
+finjusterad Laya och Kev-4B, följt av modellernas hanteringsförslag och HTTP-svarstid.
+Alla använder samma 266 mänskligt etiketterade valideringsfall från träningsrapporten.
+Originalexportens SHA-256 matchar checkpointens metadata; fallurval, kontrollsummor
+och klassantal finns i `comparisons/slide28-validation/manifest.json`.
+
+De gamla tracesen saknar fullständiga historiska envelopes, regelkonfigurationer,
+sessionsräknare och oberoende referenser för slutbeslut. Därför mäter denna körning
+bara modellernas svar. Den kör varken regler, policy, granskare eller kommandon.
+`handling.intervention` jämför förslag som skiljer sig från `allow` med de mänskliga
+hanteringsetiketterna; det är inte uppmätta avbrott i hela systemet.
+
+Samla varje modell separat i en ny resultatkatalog med den frysta experimentfilen.
+Starta först motsvarande isolerade server på porten i experimentfilen. Exempel:
 
 ```bash
-python presentation/scripts/collect_backend_metrics.py \
-  --report comparisons/starter-20261019/results/report/report.json
+.venv/bin/python -u -m lgh.eval.model_comparison \
+  --dataset comparisons/slide28-validation/dataset.jsonl \
+  --experiment comparisons/slide28-validation/experiment-models.json \
+  --backend kev --output comparisons/slide28-validation/run-02/kev
 ```
 
-`data/backend-comparison.json` innehåller bara aggregat, rapportens relativa sökväg
-och SHA-256. Inga kommandon eller tillstånd kopieras. Det gör att bilderna fungerar
+Upprepa för `laya_current` och `laya_released` med respektive server och utdatamapp.
+Ändra inte fall, etiketter, experimentfil eller evalueringskod mellan körningarna.
+Kombinera färdiga pass och uppdatera sedan presentationsaggregatet:
+
+```bash
+.venv/bin/python -m lgh.eval.model_comparison \
+  --runs comparisons/slide28-validation/run-02/laya_current \
+         comparisons/slide28-validation/run-02/laya_released \
+         comparisons/slide28-validation/run-02/kev \
+  --output comparisons/slide28-validation/run-02/report
+.venv/bin/python presentation/scripts/collect_backend_metrics.py \
+  --report comparisons/slide28-validation/run-02/report/report.json \
+  --validation-manifest comparisons/slide28-validation/manifest.json
+```
+
+`data/backend-comparison.json` innehåller bara aggregat och spårbarhet till rapporten
+och valideringsurvalet med relativa sökvägar och SHA-256. Inga kommandon eller tillstånd kopieras. Det gör att bilderna fungerar
 även när de lokala, git-ignorerade jämförelsefilerna saknas.
 
-Det nuvarande underlaget är riktiga modellkörningar på 24 påhittade scenarier med
-AI-föreslagna referensetiketter, inte ett oberoende blint test från riktigt arbete.
-Bilderna markerar därför jämförelsen som explorativ. Svarstiden är HTTP-medianen
-för första uppmätta anropet per fall efter uppvärmning, utan granskning eller mänsklig
-väntetid. Rapporten ger `inconclusive` för modellval.
+Varje modell körs tre gånger efter en separat uppvärmning på ett fall som inte ingår
+i utvärderingen. Bara första genomgången används för kvalitet, så upprepningar
+ökar inte antalet oberoende fall. Svarstiden på bilden är HTTP-medianen för första
+genomgången, utan modellstart, granskning eller mänsklig väntetid. Alla råa mättider
+och svar sparas lokalt. Etiketterna för första respektive upprepade genomgångar
+bevisar inte cachemissar, cacheträffar eller kallstart.
+
+Underlaget användes redan för Layas early stopping och temperaturanpassning.
+Jämförelsen är därför explorativ och ger `inconclusive` för modellval. En oberoende
+testmängd behövs före slutsatser om generalisering eller byte av aktiv modell.
 
 Vid en ny rapport: kontrollera scenariernas och etiketternas ursprung, hårdvaran,
 slutsatserna på båda bilderna och talarmanuset innan presentationen används igen.

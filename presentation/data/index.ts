@@ -55,8 +55,8 @@ export const recorded = recordedJson as unknown as Recorded
 export const metrics = metricsJson
 export const backendComparison = backendComparisonJson
 export const backendModels = [
-  { key: 'laya_current', label: 'Finjusterad Laya' },
   { key: 'laya_released', label: 'Grundmodell Laya' },
+  { key: 'laya_current', label: 'Finjusterad Laya' },
   { key: 'kev', label: 'Kev-4B' },
 ] as const
 

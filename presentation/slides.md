@@ -24,8 +24,9 @@ Hur en liten beslutsmodell vaktar en AI-kodagent, och hur jag finjusterade den p
 <!--
 Hej! Jag ska visa mitt projekt, Laya Guardrail Harness, förkortat LGH.
 Det handlar om att låta en AI-kodagent arbeta, men med något som kontrollerar varje kommando innan det körs.
-Presentationen har tre delar: vad Laya är och hur den skiljer sig från en vanlig språkmodell,
-hur jag samlade in data och finjusterade den, och till sist en live-demo.
+Först visar jag vad Laya är, hur den skiljer sig från en vanlig språkmodell och provar den i en live-demo.
+Sedan går jag igenom hur jag samlade in data och finjusterade den.
+Till sist visar jag resultaten och jämförelsen med Kev-4B.
 -->
 
 ---
@@ -348,7 +349,7 @@ const frontierShare = t.final_decisions.FRONTIER_REVIEW / t.decisions
 <div class="card"><div class="kicker">Frekvens</div><div class="big-number">{{ formatNumber(t.decisions) }}</div><p>beslut på {{ days }} dagar, från mitt eget arbete. Ett anrop vid <strong>varje</strong> verktygsanrop. Tar varje anrop sekunder står agenten still.</p></div>
 <div class="card"><div class="kicker">Latensbudget</div><div class="big-number">{{ formatNumber(metrics.laya_config.timeout_seconds) }} s</div><p>Timeout för Laya i hooken. LLM-granskaren har {{ metrics.frontier_timeout_seconds }} s och används därför bara när det verkligen behövs.</p></div>
 <div class="card"><div class="kicker">Trösklar kräver sannolikheter</div><p>Policyn säger till exempel ”destruktiv risk över {{ formatPercent(metrics.laya_config.thresholds.destructive) }} → eskalera”. Då måste 85 % betyda 85 %. Det går att kalibrera och mäta hos Laya, inte hos fri text.</p></div>
-<div class="card"><div class="kicker">Integritet och kostnad</div><p>Kommandon, filnamn och mål stannar på datorn. Ingen API-kostnad per kommando. Och modellen går att <strong>finjustera på min egen data</strong>.</p></div>
+<div class="card"><div class="kicker">Integritet och kostnad</div><p>Laya bedömer kommandon, filnamn och mål lokalt utan API-kostnad. Vid LLM-granskning skickas kontext till en extern tjänst. Modellen går att <strong>finjustera på min egen data</strong>.</p></div>
 </div>
 
 <div class="muted text-xs mt-3">Med grundmodellen hade {{ formatPercent(frontierShare) }} av besluten i shadow-läge gått vidare till LLM-granskning, för att den var för osäker. Det var ett av skälen till att finjustera.</div>
@@ -357,6 +358,8 @@ const frontierShare = t.final_decisions.FRONTIER_REVIEW / t.decisions
 Det här är kärnan i varför jag valde Laya. Det är frekvensen som avgör.
 Tre tusen beslut på några veckor. Med en LLM på tio sekunder per beslut hade det varit åtta timmar väntan.
 Och för att trösklar ska fungera måste sannolikheterna betyda något. Det går att mäta och justera hos Laya.
+Den lokala bedömningen hos Laya kräver ingen extern tjänst. Vid eskalering till Claude lämnar granskningskontexten datorn.
+Med grundmodellen skulle ungefär två tredjedelar av shadow-besluten ha krävt LLM-granskning. Färre eskaleringar är ett mål, inte ett uppnått resultat.
 -->
 
 ---
@@ -366,8 +369,8 @@ Och för att trösklar ska fungera måste sannolikheterna betyda något. Det gå
 <div class="grid grid-cols-2 gap-6 mt-6">
 <div class="card">
 <div class="kicker"><span class="dot llm" />Frontier-granskare</div>
-<h3>De sällsynta, svåra fallen</h3>
-<p>När Laya är osäker eller policyn eskalerar får en stor modell titta. Det händer sällan, så då är några sekunder okej.</p>
+<h3>De osäkra och svåra fallen</h3>
+<p>När Laya är osäker eller policyn eskalerar får en stor modell titta. Målet är att bara eskalera undantagen. Grundmodellen var ännu för osäker.</p>
 </div>
 <div class="card">
 <div class="kicker"><span class="dot llm" />Lärare vid etikettering</div>
@@ -377,12 +380,13 @@ Och för att trösklar ska fungera måste sannolikheterna betyda något. Det gå
 </div>
 
 <div class="card mt-6 text-center">
-<p class="text-lg!"><strong>Rätt verktyg för rätt frekvens:</strong> Laya för varje kommando, LLM för undantagen, människa för det oåterkalleliga.</p>
+<p class="text-lg!"><strong>Målet för arbetsfördelningen:</strong> Laya för den löpande bedömningen, LLM för undantagen, människa när regler eller policy kräver det.</p>
 </div>
 
 <!--
 Det här är inte "Laya mot LLM". Båda behövs.
 Laya tar volymen. LLM:en tar de svåra fallen och hjälper mig att etikettera snabbare.
+Att LLM:en bara ska behövas för undantag är ett mål. Shadow-siffrorna på förra bilden visar att grundmodellen skulle ha krävt granskning för ofta.
 Men LLM:ens förslag sparas aldrig automatiskt. Jag tränar aldrig på en modells egna gissningar.
 -->
 
@@ -784,86 +788,97 @@ Det är därför Laya bara är en sensor och de hårda reglerna kommer först. O
 -->
 
 ---
+class: compact-table
+---
 
 # Laya och Kev-4B på samma {{ backendComparison.rows }} fall
 
 <script setup>
 import { backendComparison, backendModels } from './data'
 const risks = [
-  { key: 'destructive_risk', label: 'Förstörande handlingar' },
-  { key: 'sensitive_resource', label: 'Känsliga resurser' },
-  { key: 'external_impact', label: 'Extern påverkan' },
+  { key: 'destructive_risk', cls: 'true', label: 'Förstörande = ja' },
+  { key: 'external_impact', cls: 'true', label: 'Påverkar externt = ja' },
+  { key: 'verification_needed', cls: 'true', label: 'Behöver kontroll = ja' },
+  { key: 'handling', cls: 'verify', label: 'Hantering = verify' },
+  { key: 'handling', cls: 'replan', label: 'Hantering = replan' },
 ]
 </script>
 
-<p class="text-lg mt-5">Hittade riskfall i modellens egna svar, före regler och policy</p>
+<p class="text-lg mt-4">Samma valideringsfall och samma klasser som på föregående bild</p>
 
 <table class="mt-5">
-<thead><tr><th>Risk</th><th v-for="model in backendModels" :key="model.key">{{ model.label }}</th></tr></thead>
+<thead><tr><th>Klass</th><th v-for="model in backendModels" :key="model.key">{{ model.label }}</th></tr></thead>
 <tbody>
-<tr v-for="risk in risks" :key="risk.key">
+<tr v-for="risk in risks" :key="risk.key + risk.cls">
 <td>{{ risk.label }}</td>
-<td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].risks[risk.key].correct }} / {{ backendComparison.backends[model.key].risks[risk.key].support }}</td>
+<td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].classes[risk.key][risk.cls].correct }} / {{ backendComparison.backends[model.key].classes[risk.key][risk.cls].support }}</td>
 </tr>
 </tbody>
 </table>
 
-<p class="mt-6"><strong>I de här fallen hittar både grundmodellen och Kev fler risker än min finjusterade Laya.</strong></p>
+<p class="mt-5"><strong>Vi byter modell och behåller fallen, frågorna och de mänskliga etiketterna.</strong></p>
 
-<div class="muted text-xs mt-5">Explorativt: {{ backendComparison.rows }} påhittade fall, riktiga modellkörningar och AI-föreslagna referensetiketter. Överlapp med träningsdata är okänt.</div>
+<div class="muted text-xs mt-4">{{ backendComparison.rows }} valideringsfall från riktigt arbete. Laya använde dem för modellval och kalibrering. Detta är ingen oberoende testmängd.</div>
 
 <!--
-Här jämför jag tre modeller på exakt samma 24 påhittade scenarier och samma sju frågor.
+Här jämför jag tre modeller på exakt samma 266 valideringsfall och samma sju frågor som ligger bakom föregående bild.
+Originalexportens SHA-256 matchar träningsrapporten. De 266 senaste fallen har plockats ut med träningens ursprungliga tidsuppdelning.
 Finjusterad Laya är mitt nuvarande checkpoint. Grundmodellen är den släppta laya-typed-decisions-modellen.
 Kev är jaredpalmer/kev-4b@v1.0. Ingen modell tränas under jämförelsen.
-Tabellen räknar hittade positiva riskfall enligt referensetiketterna. Samma fall kan ha flera risker, så raderna ska inte summeras.
+Tabellen visar samma fem klasser som föregående bild, enligt de ursprungliga mänskliga etiketterna. Samma fall kan ingå i flera rader, så raderna ska inte summeras.
 Resultaten använder det första uppmätta svaret per fall. De upprepade anropen ger inte fler oberoende testfall.
-Kev hittar fler av de utvalda riskerna, men testet är litet och etiketterna är AI-förslag, inte ett oberoende mänskligt facit.
-Det här är en första diagnos. Det visar inte vilken modell som generellt är säkrast.
-Nästa fråga är vad modellernas olika svar betyder när samma regler och policy också finns med.
-Källa: comparisons/starter-20261019/results/report/report.json, models.*.*.classes.true.
-Etiketternas ursprung: comparisons/starter-20261019/REVIEW-LABELS.md.
+De två Laya-modellerna återger alla fem rader från träningsrapporten exakt i den nya körningen.
+Kev hittar ett av fem förstörande fall och två av åtta externa, men bara ett av 101 kontrollbehov. Den väljer verify rätt i tio av 100 fall och replan i noll av två.
+Det finns bara fem förstörande fall och två replan-fall. Små skillnader i antal räcker inte för säkra slutsatser.
+Laya använde redan denna valideringsdata för early stopping och temperaturanpassning. Jämförelsen beskriver dessa fall, inte oberoende generalisering.
+Nästa bild visar modellernas hanteringsförslag och svarstid utan regler eller policy. Full historisk information för systemreplay finns inte sparad.
+Källa: presentation/data/backend-comparison.json och dess source_report, models.*.*.classes.
+Fallens ursprung och kontrollsummor: comparisons/slide28-validation/manifest.json.
 Presentationsaggregat: presentation/data/backend-comparison.json; källrapportens SHA-256 sparas där.
 -->
 
 ---
 
-# Vad blir konsekvensen för agenten?
+# Modellernas hantering och svarstid
 
 <script setup>
 import { backendComparison, backendModels, formatMs } from './data'
 </script>
 
-<p class="text-lg mt-5">Samma fall genom regler och policy, med varje modells svar</p>
+<p class="text-lg mt-5">Samma {{ backendComparison.rows }} valideringsfall, utan regler eller policy</p>
 
 <table class="mt-5">
 <thead><tr><th>Mått</th><th v-for="model in backendModels" :key="model.key">{{ model.label }}</th></tr></thead>
 <tbody>
-<tr><td>Missade ingripanden på riskfall</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].harness.missed }} / {{ backendComparison.backends[model.key].harness.needed }}</td></tr>
-<tr><td>Onödiga ingripanden på ofarliga fall</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].harness.unnecessary }} / {{ backendComparison.backends[model.key].harness.safe }}</td></tr>
-<tr><td>HTTP-svarstid, median¹</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ formatMs(backendComparison.backends[model.key].http_first_observed.p50_ms) }}</td></tr>
+<tr><td>Föreslår allow trots verify/replan</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].handling.missed }} / {{ backendComparison.backends[model.key].handling.needed }}</td></tr>
+<tr><td>Föreslår annan hantering trots allow</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].handling.unnecessary }} / {{ backendComparison.backends[model.key].handling.safe }}</td></tr>
+<tr><td>HTTP-svarstid, median¹</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ formatMs(backendComparison.backends[model.key].http_first_pass.p50_ms) }}</td></tr>
 </tbody>
 </table>
 
-<p class="mt-6"><strong>Kev missar färre ingripanden än min finjustering, men avbryter fler ofarliga handlingar.</strong></p>
+<p class="mt-6"><strong>Hanteringsförslaget jämförs med etiketten. Systemets slutliga beslut mäts inte här.</strong></p>
 
-<div class="muted text-xs mt-4">¹ Första uppmätta anropet per fall, efter uppvärmning. Separata CUDA-körningar på RTX 3090; HTTP-tiden omfattar inte granskning eller väntan på en människa.</div>
-<div class="muted text-xs mt-3">Explorativt: {{ backendComparison.rows }} påhittade fall och AI-föreslagna etiketter. Besluten simuleras offline. Rapportens slutsats: otillräckligt underlag för modellbyte.</div>
+<div class="muted text-xs mt-4">¹ Första genomgången efter uppvärmning, {{ backendComparison.rows }} HTTP-anrop per modell. Separata CUDA-körningar på RTX 3090, utan modellstart, granskning eller mänsklig väntetid.</div>
+<div class="muted text-xs mt-3">Mänskliga hanteringsetiketter: verify/replan kräver annan hantering än allow. Valideringsdata som Laya redan använt för modellval och kalibrering.</div>
 
 <!--
-Nu visar jag hela kedjans beslut, inte bara modellens egna riskbedömningar.
-Av 15 fall som enligt referenserna kräver ingripande missar min finjusterade modell fyra. Grundmodellen och Kev missar inga i det här testet.
-Priset är fler avbrott på de nio ofarliga fallen: sex med grundmodellen eller Kev, jämfört med ett med finjusteringen.
-Grundmodellen och Kev får samma antal missar och onödiga ingripanden trots olika modellbedömningar. Regler och policy påverkar utfallet.
-Hårda regler avgör tio av de 24 fallen utan modellens hjälp. Därför behöver vi mäta modell och system separat.
-Svarstiden är medianen av de 24 första uppmätta HTTP-anropen efter uppvärmning, inte kallstart eller hela agentens väntetid.
+Nu visar jag modellernas egna hanteringsförslag. De 266 fallen består av 164 allow-etiketter, 100 verify och två replan.
+Första raden räknar när modellen säger allow trots att människan valt verify eller replan: missade behov av annan hantering.
+Andra raden räknar när modellen föreslår verify, replan eller escalate trots en allow-etikett. Detta är förslag, inte observerade agentavbrott.
+Ett annat förslag än allow är inte automatiskt rätt åtgärd. Föregående bild skiljer mellan de exakta hanteringsklasserna.
+Grundmodellen missar elva av 102 verify/replan-fall, min finjustering 76 och Kev 67.
+På de 164 allow-fallen föreslår grundmodellen annan hantering 147 gånger, min finjustering 15 och Kev 59.
+Kev missar därmed färre behov av annan hantering än min finjustering i detta underlag, men föreslår också fler åtgärder på allow-fallen.
+Inga hårda regler, policytrösklar eller granskarbeslut räknas in. De gamla tracesen saknar fullständigt underlag för att återspela hela kedjan.
+Svarstiden är medianen av de 266 anropen i första genomgången efter en separat uppvärmning. Det är inte kallstart eller hela agentens väntetid.
 Alla tre kördes med CUDA på RTX 3090, men precision och serverimplementation är inte identiska. Tiderna gäller de här konfigurationerna.
-Offline-kedjan simulerar enforce-läge utan tillgänglig LLM-granskare. Inga kommandon, godkännanden eller verifieringar utförs.
-Noll observerade missar i ett så litet test bevisar inte att modellen är säker. Rapporten ger därför inconclusive.
-Nästa steg är att granska referenserna och testa på fler oberoende, blint etiketterade fall från riktigt arbete.
+Alla modeller körs tre gånger. Bara första svaret används för kvalitetsmåtten; senare svar används för mättider och kontroll av om svaren ändras.
+Inga kommandon, godkännanden eller verifieringar utförs.
+Underlaget är Layas tidigare valideringsdata och räcker inte som oberoende underlag för modellbyte.
+Nästa steg är fler oberoende, blint etiketterade fall från riktigt arbete.
 Sedan knyter jag ihop det med de fyra tidigare demokommandona och visar hur lagren samverkar.
-Källa: comparisons/starter-20261019/results/report/report.json, harness.*.all.final_decision,
-latency.*.http.first_observed, runtime och selection. Etiketternas ursprung: comparisons/starter-20261019/REVIEW-LABELS.md.
+Källa: presentation/data/backend-comparison.json och dess source_report, models.*.handling.intervention,
+latency.*.http.first_pass och runtime. Fallens ursprung: comparisons/slide28-validation/manifest.json.
 -->
 
 ---
@@ -933,16 +948,16 @@ Den största överraskningen var hur bra resultatet såg ut på ytan, och hur d�
 # Nästa steg
 
 <div class="grid grid-cols-2 gap-4 mt-6">
-<div class="card" v-click><h3>1. Granska jämförelsens etiketter</h3><p>Kontrollera AI-förslagen mot varje fall och rätta fel.</p></div>
-<div class="card" v-click><h3>2. Testa på oberoende fall</h3><p>Etikettera nya fall från riktigt arbete utan att se modellernas svar. Ta med fler riskfall.</p></div>
+<div class="card" v-click><h3>1. Samla ett oberoende test</h3><p>Etikettera nya fall från riktigt arbete utan att se modellernas svar.</p></div>
+<div class="card" v-click><h3>2. Ta med fler riskfall</h3><p>Samla och granska fler förstörande handlingar, externa ändringar och fall som kräver omplanering.</p></div>
 <div class="card" v-click><h3>3. Förbättra datan och mät igen</h3><p>Samla fler riskexempel, träna om och jämför missade risker, onödiga avbrott och svarstid före modellval.</p></div>
 </div>
 
 <!--
 Modellen är inte redo att stoppa något på riktigt, och det är okej. Det är därför shadow-läget finns.
 Det viktigaste nästa steget är mer och bättre data om de farliga fallen.
-Kev-jämförelsen ger en riktning att undersöka, men de 24 påhittade fallen och AI-föreslagna etiketterna räcker inte för ett modellbyte.
-Jag behöver granska referenserna och skapa ett oberoende test med blinda etiketter från riktigt arbete.
+Kev-jämförelsen använder nu exakt samma 266 mänskligt etiketterade valideringsfall som träningsrapporten.
+Laya använde redan fallen för modellval och kalibrering. Jag behöver därför ett oberoende test med blinda etiketter från riktigt arbete före ett modellbyte.
 Viktning av sällsynta klasser är också något att pröva vid ny träning, och sedan utvärdera på samma oberoende test.
 -->
 
