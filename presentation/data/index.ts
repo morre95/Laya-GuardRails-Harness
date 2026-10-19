@@ -1,5 +1,6 @@
 import metricsJson from './metrics.json'
 import recordedJson from './recorded.json'
+import backendComparisonJson from './backend-comparison.json'
 
 export interface ChoiceAnswer {
   type: 'choice'
@@ -52,6 +53,12 @@ export interface Recorded {
 
 export const recorded = recordedJson as unknown as Recorded
 export const metrics = metricsJson
+export const backendComparison = backendComparisonJson
+export const backendModels = [
+  { key: 'laya_current', label: 'Finjusterad Laya' },
+  { key: 'laya_released', label: 'Grundmodell Laya' },
+  { key: 'kev', label: 'Kev-4B' },
+] as const
 
 export const SCENARIOS: Record<string, string> = {
   ls: 'ls src/app',

@@ -785,31 +785,85 @@ Det är därför Laya bara är en sensor och de hårda reglerna kommer först. O
 
 ---
 
-# Test på helt osedda fall: `lgh compare`
+# Laya och Kev-4B på samma {{ backendComparison.rows }} fall
 
 <script setup>
-import { metrics, QUESTION_LABELS, formatNumber } from './data'
-const c = metrics.comparison
+import { backendComparison, backendModels } from './data'
+const risks = [
+  { key: 'destructive_risk', label: 'Förstörande handlingar' },
+  { key: 'sensitive_resource', label: 'Känsliga resurser' },
+  { key: 'external_impact', label: 'Extern påverkan' },
+]
 </script>
 
-<div class="grid grid-cols-[1fr_1.2fr] gap-6 mt-2">
-<div class="grid gap-3 content-start">
-<div class="card"><h3>Frysta indata, två modeller</h3><p>Grundmodellen och den finjusterade körs på exakt samma tillstånd. Ingen träning sker. Kommandon behandlas som text och körs aldrig.</p></div>
-<div class="card"><h3>Kontroll av överlapp</h3><p>Testet vägrar köra om fall finns i träningsdatan. Kontrollsumman för träningsexporten måste matcha modellens metadata. Resultat: <span class="tag laya">{{ c.audit_status }}</span></p></div>
-</div>
-<div class="card">
-<h3>{{ c.rows }} nya fall efter träningen, ännu utan etiketter</h3>
-<p class="muted">Antal fall där modellerna valde olika svar:</p>
-<CountBars :items="Object.entries(c.disagreements).map(([k, v]) => ({ label: QUESTION_LABELS[k], value: v }))" />
-<p class="muted text-xs mt-2">Utan mina etiketter syns bara <em>att</em> de skiljer sig, inte vem som har rätt. Nästa steg är att etikettera blint och köra om.</p>
-</div>
-</div>
+<p class="text-lg mt-5">Hittade riskfall i modellens egna svar, före regler och policy</p>
+
+<table class="mt-5">
+<thead><tr><th>Risk</th><th v-for="model in backendModels" :key="model.key">{{ model.label }}</th></tr></thead>
+<tbody>
+<tr v-for="risk in risks" :key="risk.key">
+<td>{{ risk.label }}</td>
+<td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].risks[risk.key].correct }} / {{ backendComparison.backends[model.key].risks[risk.key].support }}</td>
+</tr>
+</tbody>
+</table>
+
+<p class="mt-6"><strong>I de här fallen hittar både grundmodellen och Kev fler risker än min finjusterade Laya.</strong></p>
+
+<div class="muted text-xs mt-5">Explorativt: {{ backendComparison.rows }} påhittade fall, riktiga modellkörningar och AI-föreslagna referensetiketter. Överlapp med träningsdata är okänt.</div>
 
 <!--
-Valideringsdatan användes under träningen, för early stopping och temperatur. Därför behövs ett test på helt ny data.
-lgh compare kör båda modellerna på nya fall och kontrollerar att inget av dem fanns i träningen.
-Hittills har jag bara nio nya fall och har inte etiketterat dem. Jag ska etikettera dem utan att titta på modellernas svar först, annars påverkas jag.
-Nio fall räcker för att testa arbetsflödet, inte för att dra slutsatser.
+Här jämför jag tre modeller på exakt samma 24 påhittade scenarier och samma sju frågor.
+Finjusterad Laya är mitt nuvarande checkpoint. Grundmodellen är den släppta laya-typed-decisions-modellen.
+Kev är jaredpalmer/kev-4b@v1.0. Ingen modell tränas under jämförelsen.
+Tabellen räknar hittade positiva riskfall enligt referensetiketterna. Samma fall kan ha flera risker, så raderna ska inte summeras.
+Resultaten använder det första uppmätta svaret per fall. De upprepade anropen ger inte fler oberoende testfall.
+Kev hittar fler av de utvalda riskerna, men testet är litet och etiketterna är AI-förslag, inte ett oberoende mänskligt facit.
+Det här är en första diagnos. Det visar inte vilken modell som generellt är säkrast.
+Nästa fråga är vad modellernas olika svar betyder när samma regler och policy också finns med.
+Källa: comparisons/starter-20261019/results/report/report.json, models.*.*.classes.true.
+Etiketternas ursprung: comparisons/starter-20261019/REVIEW-LABELS.md.
+Presentationsaggregat: presentation/data/backend-comparison.json; källrapportens SHA-256 sparas där.
+-->
+
+---
+
+# Vad blir konsekvensen för agenten?
+
+<script setup>
+import { backendComparison, backendModels, formatMs } from './data'
+</script>
+
+<p class="text-lg mt-5">Samma fall genom regler och policy, med varje modells svar</p>
+
+<table class="mt-5">
+<thead><tr><th>Mått</th><th v-for="model in backendModels" :key="model.key">{{ model.label }}</th></tr></thead>
+<tbody>
+<tr><td>Missade ingripanden på riskfall</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].harness.missed }} / {{ backendComparison.backends[model.key].harness.needed }}</td></tr>
+<tr><td>Onödiga ingripanden på ofarliga fall</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ backendComparison.backends[model.key].harness.unnecessary }} / {{ backendComparison.backends[model.key].harness.safe }}</td></tr>
+<tr><td>HTTP-svarstid, median¹</td><td v-for="model in backendModels" :key="model.key" class="mono">{{ formatMs(backendComparison.backends[model.key].http_first_observed.p50_ms) }}</td></tr>
+</tbody>
+</table>
+
+<p class="mt-6"><strong>Kev missar färre ingripanden än min finjustering, men avbryter fler ofarliga handlingar.</strong></p>
+
+<div class="muted text-xs mt-4">¹ Första uppmätta anropet per fall, efter uppvärmning. Separata CUDA-körningar på RTX 3090; HTTP-tiden omfattar inte granskning eller väntan på en människa.</div>
+<div class="muted text-xs mt-3">Explorativt: {{ backendComparison.rows }} påhittade fall och AI-föreslagna etiketter. Besluten simuleras offline. Rapportens slutsats: otillräckligt underlag för modellbyte.</div>
+
+<!--
+Nu visar jag hela kedjans beslut, inte bara modellens egna riskbedömningar.
+Av 15 fall som enligt referenserna kräver ingripande missar min finjusterade modell fyra. Grundmodellen och Kev missar inga i det här testet.
+Priset är fler avbrott på de nio ofarliga fallen: sex med grundmodellen eller Kev, jämfört med ett med finjusteringen.
+Grundmodellen och Kev får samma antal missar och onödiga ingripanden trots olika modellbedömningar. Regler och policy påverkar utfallet.
+Hårda regler avgör tio av de 24 fallen utan modellens hjälp. Därför behöver vi mäta modell och system separat.
+Svarstiden är medianen av de 24 första uppmätta HTTP-anropen efter uppvärmning, inte kallstart eller hela agentens väntetid.
+Alla tre kördes med CUDA på RTX 3090, men precision och serverimplementation är inte identiska. Tiderna gäller de här konfigurationerna.
+Offline-kedjan simulerar enforce-läge utan tillgänglig LLM-granskare. Inga kommandon, godkännanden eller verifieringar utförs.
+Noll observerade missar i ett så litet test bevisar inte att modellen är säker. Rapporten ger därför inconclusive.
+Nästa steg är att granska referenserna och testa på fler oberoende, blint etiketterade fall från riktigt arbete.
+Sedan knyter jag ihop det med de fyra tidigare demokommandona och visar hur lagren samverkar.
+Källa: comparisons/starter-20261019/results/report/report.json, harness.*.all.final_decision,
+latency.*.http.first_observed, runtime och selection. Etiketternas ursprung: comparisons/starter-20261019/REVIEW-LABELS.md.
 -->
 
 ---
@@ -879,14 +933,17 @@ Den största överraskningen var hur bra resultatet såg ut på ytan, och hur d�
 # Nästa steg
 
 <div class="grid grid-cols-2 gap-4 mt-6">
-<div class="card" v-click><h3>1. Samla in mer tränings data</h3><p>Var nogare när den märks ut.</p></div>
-<div class="card" v-click><h3>2. Vikta sällsynta klasser</h3><p>Låt ett missat riskfall kosta mer än ett missat ofarligt fall under träningen.</p></div>
-    <div class="card" v-click><h3>3. Träna om</h3><p>Jag tror inte frågan är om det går utan hur bra datan man tränar på är.</p></div>
+<div class="card" v-click><h3>1. Granska jämförelsens etiketter</h3><p>Kontrollera AI-förslagen mot varje fall och rätta fel.</p></div>
+<div class="card" v-click><h3>2. Testa på oberoende fall</h3><p>Etikettera nya fall från riktigt arbete utan att se modellernas svar. Ta med fler riskfall.</p></div>
+<div class="card" v-click><h3>3. Förbättra datan och mät igen</h3><p>Samla fler riskexempel, träna om och jämför missade risker, onödiga avbrott och svarstid före modellval.</p></div>
 </div>
 
 <!--
 Modellen är inte redo att stoppa något på riktigt, och det är okej. Det är därför shadow-läget finns.
 Det viktigaste nästa steget är mer och bättre data om de farliga fallen.
+Kev-jämförelsen ger en riktning att undersöka, men de 24 påhittade fallen och AI-föreslagna etiketterna räcker inte för ett modellbyte.
+Jag behöver granska referenserna och skapa ett oberoende test med blinda etiketter från riktigt arbete.
+Viktning av sällsynta klasser är också något att pröva vid ny träning, och sedan utvärdera på samma oberoende test.
 -->
 
 ---

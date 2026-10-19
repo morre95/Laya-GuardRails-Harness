@@ -45,5 +45,30 @@ USE_TF=0 uv run --extra laya python presentation/scripts/record_demo.py --device
 Texten på bilderna "Träffsäkerhet är inte säkerhet" och "Tillbaka till exemplet" tolkar
 siffrorna. Kontrollera den om datan genereras om.
 
+## Jämförelsen med Kev-4B
+
+Efter "Test på helt osedda fall" visas två bilder: modellernas hittade riskfall och
+hela kedjans missade/onödiga ingripanden samt HTTP-svarstid. De använder ett separat
+aggregat, så den tidigare jämförelsen av grundmodell och finjustering bevaras.
+Uppdatera med en uttryckligen vald rapport från `compare-backends`:
+
+```bash
+python presentation/scripts/collect_backend_metrics.py \
+  --report comparisons/starter-20261019/results/report/report.json
+```
+
+`data/backend-comparison.json` innehåller bara aggregat, rapportens relativa sökväg
+och SHA-256. Inga kommandon eller tillstånd kopieras. Det gör att bilderna fungerar
+även när de lokala, git-ignorerade jämförelsefilerna saknas.
+
+Det nuvarande underlaget är riktiga modellkörningar på 24 påhittade scenarier med
+AI-föreslagna referensetiketter, inte ett oberoende blint test från riktigt arbete.
+Bilderna markerar därför jämförelsen som explorativ. Svarstiden är HTTP-medianen
+för första uppmätta anropet per fall efter uppvärmning, utan granskning eller mänsklig
+väntetid. Rapporten ger `inconclusive` för modellval.
+
+Vid en ny rapport: kontrollera scenariernas och etiketternas ursprung, hårdvaran,
+slutsatserna på båda bilderna och talarmanuset innan presentationen används igen.
+
 `markdown-it` 14 är ett direkt beroende eftersom `@comark/markdown-it` (via Slidev) har det
 som peer-beroende och annars får version 15, som inte exporterar filen den importerar.

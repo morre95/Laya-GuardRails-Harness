@@ -1,0 +1,108 @@
+{
+  "source_report": "comparisons/starter-20261019/results/report/report.json",
+  "source_sha256": "471f663aeab42a02d3bc6d0b8bdbadf45e904394368cc2fc5e20eec8c7de57dd",
+  "rows": 24,
+  "purpose": "benchmark",
+  "mode": "labeled",
+  "selection": {
+    "status": "inconclusive",
+    "reason": "No observed safety regression, but no predeclared equivalence evidence rule; equal counts are not proof.",
+    "paired_risk_regressions": 0,
+    "model_risk_regressions": []
+  },
+  "backends": {
+    "laya_current": {
+      "risks": {
+        "destructive_risk": {
+          "correct": 0,
+          "support": 8
+        },
+        "sensitive_resource": {
+          "correct": 0,
+          "support": 6
+        },
+        "external_impact": {
+          "correct": 0,
+          "support": 4
+        }
+      },
+      "harness": {
+        "needed": 15,
+        "missed": 4,
+        "safe": 9,
+        "unnecessary": 1
+      },
+      "http_first_observed": {
+        "n": 24,
+        "p50_ms": 34.11250250019293,
+        "p95_ms": 38.80912194986195
+      },
+      "audit_status": "unknown",
+      "device": "cuda",
+      "hardware": "NVIDIA RTX 3090",
+      "dataset_note": "Curated fictitious starter cases; assistant-proposed references, not a blind real-work holdout."
+    },
+    "laya_released": {
+      "risks": {
+        "destructive_risk": {
+          "correct": 4,
+          "support": 8
+        },
+        "sensitive_resource": {
+          "correct": 2,
+          "support": 6
+        },
+        "external_impact": {
+          "correct": 3,
+          "support": 4
+        }
+      },
+      "harness": {
+        "needed": 15,
+        "missed": 0,
+        "safe": 9,
+        "unnecessary": 6
+      },
+      "http_first_observed": {
+        "n": 24,
+        "p50_ms": 34.554581500287895,
+        "p95_ms": 37.41358589977608
+      },
+      "audit_status": "unknown",
+      "device": "cuda",
+      "hardware": "NVIDIA RTX 3090",
+      "dataset_note": "Curated fictitious starter cases; assistant-proposed references, not a blind real-work holdout."
+    },
+    "kev": {
+      "risks": {
+        "destructive_risk": {
+          "correct": 8,
+          "support": 8
+        },
+        "sensitive_resource": {
+          "correct": 5,
+          "support": 6
+        },
+        "external_impact": {
+          "correct": 4,
+          "support": 4
+        }
+      },
+      "harness": {
+        "needed": 15,
+        "missed": 0,
+        "safe": 9,
+        "unnecessary": 6
+      },
+      "http_first_observed": {
+        "n": 24,
+        "p50_ms": 138.25714700033132,
+        "p95_ms": 241.92823110001882
+      },
+      "audit_status": "unknown",
+      "device": "cuda",
+      "hardware": "NVIDIA RTX 3090",
+      "dataset_note": "Curated fictitious starter cases; assistant-proposed references, not a blind real-work holdout."
+    }
+  }
+}
