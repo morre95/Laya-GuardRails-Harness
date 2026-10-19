@@ -1,7 +1,7 @@
 ---
 theme: default
 title: Laya Guardrail Harness
-info: Skolprojekt. Hur en liten beslutsmodell vaktar en kodagent, och hur den finjusterades.
+info: VG-projekt. Hur en liten beslutsmodell vaktar en kodagent, och hur den finjusterades.
 colorSchema: light
 transition: fade
 mdc: true
@@ -13,7 +13,7 @@ layout: cover
 class: text-left
 ---
 
-<div class="kicker">Skolprojekt · Laya Guardrail Harness</div>
+<div class="kicker">VG-projekt · Laya Guardrail Harness</div>
 
 # Sju frågor, ett pass
 
