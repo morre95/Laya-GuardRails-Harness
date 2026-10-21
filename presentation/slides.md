@@ -430,30 +430,48 @@ Jag går igenom dem ett i taget.
 
 ---
 
-# 1. Insamling i shadow-läge
+# Insamling i shadow-läge
 
 <script setup>
-import { metrics, formatNumber } from './data'
+import { metrics, formatNumber, QUESTION_LABELS } from './data'
 const t = metrics.traces
+const d = metrics.labels.distributions
+const choices = ['task_alignment', 'reversibility', 'handling']
+const risks = ['destructive_risk', 'sensitive_resource', 'external_impact', 'verification_needed']
+const toItems = counts => Object.entries(counts).map(([label, value]) => ({ label, value }))
 </script>
 
-<div class="grid grid-cols-[1.3fr_1fr] gap-6 mt-2">
-<div>
-<div class="kicker mb-2">Beslut per dag, {{ t.per_day[0].label }} – {{ t.per_day[t.per_day.length - 1].label }}</div>
-<CountBars :items="t.per_day" columns height="11rem" />
-<p class="text-sm mt-6">{{ formatNumber(t.decisions) }} beslut, varav {{ formatNumber(t.with_state) }} med sparat tillstånd som går att etikettera.</p>
-</div>
-<div class="grid gap-3 content-start">
-<div class="card"><h3>Det som sparas</h3><p>Mål, plan, kommando, gren, ändrade filer och miljö. Exakt det Laya ser vid inferens.</p></div>
-<div class="card"><h3>Det som aldrig sparas</h3><p>Hemligheter, API-nycklar, <code>.env</code>-innehåll, privata nycklar och hela källfiler. Känsliga mål loggas bara som metadata, <code>contentsLogged: false</code>.</p></div>
-<div class="card"><h3>Hashkedja</h3><p>Varje trace har <code>prevHash</code>, så det syns om loggen ändrats i efterhand.</p></div>
+<p class="text-sm mt-2">{{ formatNumber(metrics.labels.traces) }} mänskligt etiketterade fall. Antal per svarsalternativ för alla sju frågor.</p>
+
+<div class="grid grid-cols-3 gap-3 mt-4">
+<div v-for="key in choices" :key="key" class="card">
+<h3>{{ QUESTION_LABELS[key] }}</h3>
+<CountBars :items="toItems(d[key])" :highlight="['outside_scope', 'difficult', 'irreversible', 'replan', 'escalate']" />
 </div>
 </div>
+
+<div class="grid grid-cols-4 gap-3 mt-3">
+<div v-for="key in risks" :key="key" class="card">
+<h3>{{ QUESTION_LABELS[key] }}</h3>
+<CountBars :items="toItems(d[key])" :highlight="['true']" />
+</div>
+</div>
+
+<div class="muted text-xs mt-3">Ja/nej-etiketter: <code>true</code> vid 0,5 eller högre, annars <code>false</code>. Rött markerar risk eller behov av kontroll.</div>
+<p class="text-sm mt-4">Totalt {{ formatNumber(t.decisions) }} insamlade beslut, varav {{ formatNumber(t.with_state) }} med sparat tillstånd som går att etikettera.</p>
 
 <!--
 Jag installerade hooken i Claude Code och arbetade som vanligt i flera veckor, i shadow-läge.
 Ingenting stoppades, men varje kommando bedömdes och loggades.
+Här visas hur de mänskliga etiketterna fördelar sig för var och en av de sju frågorna, inte Layas egna bedömningar.
+Varje fall har ett svar på varje fråga, så varje diagram summerar till samma antal etiketterade fall.
+De fyra ja/nej-frågorna har mjuka etiketter mellan 0 och 1. För överblicken grupperas de vid 0,5.
+De flesta fall är ofarliga. Risketiketter och hanteringarna replan och escalate är sällsynta.
+Det som sparas är mål, plan, kommando, gren, ändrade filer och miljö, alltså det Laya ser vid inferens.
 Integritet var viktigt: tillståndet redigeras innan det sparas, så inga hemligheter hamnar i träningsdatan.
+Hemligheter, API-nycklar, .env-innehåll, privata nycklar och hela källfiler sparas inte. Känsliga mål loggas bara som metadata, contentsLogged: false.
+Varje trace har prevHash, så det syns om loggen ändrats i efterhand.
+Källa: presentation/data/metrics.json, labels.distributions. Alla etiketter har källa human.
 -->
 
 ---
@@ -489,67 +507,7 @@ Efter finjusteringen är den mycket säkrare. Men säker är inte samma sak som 
 
 ---
 
-# 2. Triage: hitta de sällsynta riskfallen
 
-<div class="grid grid-cols-[1fr_1.2fr] gap-6 mt-4">
-<div>
-
-De flesta kommandon är ofarliga: `ls`, `grep`, `pytest`. Etiketterar jag i tidsordning får jag tusen ”allow” och nästan inga riskfall.
-
-`lgh triage` rangordnar oetiketterade traces efter hur troligt det är att de är riskfall:
-
-- vilken regel som matchade (BLOCK, HUMAN, VERIFY)
-- mönster för radering, externa system och hemligheter
-- en svag bonus om Laya själv flaggade risk
-
-</div>
-<div class="card">
-
-```bash
-uv run lgh triage -n 50
-```
-
-<p class="mt-3">Utskriften visar poäng, trace-id, status, kommando och skälen till poängen. Med <code>--json</code> blir det en rad per fall, och <code>--min-score</code> tar bort svaga kandidater. Granskningssidan kan sortera på samma poäng.</p>
-
-<p class="mt-3 muted">Layas egen bedömning används bara för att <strong>sortera</strong> listan. Den blir aldrig en etikett.</p>
-</div>
-</div>
-
-<!--
-Ett stort problem med säkerhetsdata är att det farliga är sällsynt.
-Triage letar upp de intressanta fallen så att jag lägger tiden där.
-Viktigt: Layas egna svar blir aldrig etiketter. Annars skulle modellen bara lära sig sina egna fel.
--->
-
----
-
-# 3. Etikettering med `lgh review`
-
-<div class="grid grid-cols-[1.1fr_1fr] gap-6 mt-4">
-<div class="card">
-<div class="kicker">Lokal webbsida, 127.0.0.1:8770</div>
-<div class="grid gap-2 mt-3 text-sm">
-<div class="grid grid-cols-[9rem_1fr] gap-2"><span class="muted">Hör till uppgiften?</span><span class="mono">aligned · supporting · <strong>unclear</strong> · outside_scope</span></div>
-<div class="grid grid-cols-[9rem_1fr] gap-2"><span class="muted">Förstörande?</span><span class="mono">0.0 – <strong>0.2</strong> – 1.0</span></div>
-<div class="grid grid-cols-[9rem_1fr] gap-2"><span class="muted">Går att ångra?</span><span class="mono">trivial · <strong>recoverable</strong> · difficult · irreversible</span></div>
-<div class="grid grid-cols-[9rem_1fr] gap-2"><span class="muted">Hantering</span><span class="mono">allow · <strong>verify</strong> · replan · escalate</span></div>
-<div class="muted">… och tre frågor till</div>
-</div>
-</div>
-<div class="grid gap-3 content-start">
-<div class="card"><h3>Samma sju frågor</h3><p>Jag svarar på exakt det Laya ska svara på, för exakt det tillstånd Laya såg.</p></div>
-<div class="card"><h3>LLM föreslår, jag bestämmer</h3><p>Med <code>--propose</code> fyller en lärar-LLM i förslag. Inget sparas förrän jag klickar Spara.</p></div>
-<div class="card"><h3>Mjuka etiketter</h3><p>Ja/nej-frågor får en sannolikhet. 0,2 betyder ”troligen inte, men inte omöjligt”.</p></div>
-</div>
-</div>
-
-<!--
-Det här är det mest tidskrävande steget: att själv bedöma över tusen kommandon.
-Verktyget visar tillståndet och de sju frågorna. Man kan markera flera rader och spara samma svar på alla.
-Lärar-LLM:en snabbar upp, men jag är den som bestämmer.
--->
-
----
 
 # Vad 1 331 etiketter innehåller
 
@@ -588,40 +546,7 @@ Det är bra att jag inte gjorde många farliga saker, men det betyder att modell
 
 ---
 
-# 4. Export: samma form som vid inferens
-
-<div class="grid grid-cols-[1.2fr_1fr] gap-6 mt-4">
-<div>
-
-```python {all|3-4|all}
-# src/lgh/laya/client.py
-def state_payload(state: LayaState) -> dict[str, Any]:
-    """The state exactly as Laya sees it at inference.
-    Training data must use the same form."""
-    return state.model_dump(mode="json", exclude_none=True)
-```
-
-```bash
-uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
-```
-
-</div>
-<div class="grid gap-3 content-start">
-<div class="card"><h3>En funktion, två användningar</h3><p>Hooken och exporten använder samma funktion. Modellen tränas alltså på exakt det den sedan får se.</p></div>
-<div class="card"><h3>En rad per etikett</h3><p><code>trace_id</code>, tidsstämpel, tillstånd, de sju frågorna och mina svar.</p></div>
-</div>
-</div>
-
-<!--
-En vanlig bugg i maskininlärning är att träningsdatan ser lite annorlunda ut än det modellen får i produktion.
-Här är det samma funktion som formaterar tillståndet i båda fallen, så det kan inte glida isär.
--->
-
----
-class: compact-table
----
-
-# 5. Träning med `lgh train`
+# Träning med `lgh train`
 
 <script setup>
 import { metrics, formatNumber } from './data'
@@ -879,52 +804,6 @@ Nästa steg är fler oberoende, blint etiketterade fall från riktigt arbete.
 Sedan knyter jag ihop det med de fyra tidigare demokommandona och visar hur lagren samverkar.
 Källa: presentation/data/backend-comparison.json och dess source_report, models.*.handling.intervention,
 latency.*.http.first_pass och runtime. Fallens ursprung: comparisons/slide28-validation/manifest.json.
--->
-
----
-
-# Tillbaka till exemplet: hela kedjan
-
-<script setup>
-import { recorded, SCENARIOS } from './data'
-const rows = Object.keys(SCENARIOS).map(key => {
-  const llm = JSON.parse(recorded.llm[key].text.replace(/```(json)?/g, ''))
-  return {
-    command: SCENARIOS[key],
-    rules: recorded.pipeline[key].rules.join(', ') || 'ingen',
-    disposition: recorded.pipeline[key].rule_disposition,
-    laya: recorded.laya.fine_tuned.states[key].answers.handling.choice,
-    llm: llm.handling,
-    decision: recorded.pipeline[key].decision.fine_tuned,
-  }
-})
-</script>
-
-<table class="mt-4">
-<thead><tr><th>Kommando</th><th>Hårda regler</th><th>Laya säger</th><th>LLM säger</th><th>Slutligt beslut</th></tr></thead>
-<tbody>
-<tr v-for="r in rows" :key="r.command">
-<td class="mono">{{ r.command }}</td>
-<td><span class="mono">{{ r.rules }}</span> <span class="tag">{{ r.disposition }}</span></td>
-<td class="mono">{{ r.laya }}</td>
-<td class="mono">{{ r.llm }}</td>
-<td><strong class="mono">{{ r.decision }}</strong></td>
-</tr>
-</tbody>
-</table>
-
-<div class="grid grid-cols-2 gap-4 mt-5">
-<div class="card"><h3>Laya ensam hade släppt igenom allt</h3><p>Den finjusterade modellen säger <code>allow</code> även för <code>git push --force</code> på main. Det är samma problem som på bilden ”Träffsäkerhet är inte säkerhet”.</p></div>
-<div class="card"><h3>Kedjan fångar det ändå</h3><p>Hårda regler matchar tre av fyra kommandon och kräver en människa, oavsett vad Laya tycker. Bara <code>ls</code> går vidare till Laya.</p></div>
-</div>
-
-<div class="muted text-xs mt-3">Beräknat med projektets egna regler och policy på de inspelade, påhittade demofallen.</div>
-
-<!--
-Här är de fyra demokommandona genom hela kedjan, med projektets riktiga regelmotor och policy.
-rm -rf, force push och .env fångas av regler, och då går det till en människa.
-Laya ensam hade sagt allow på allt. LLM:en hade varit försiktigare med force push.
-Det visar varför arkitekturen är i lager: ingen enskild del behöver vara perfekt.
 -->
 
 ---
