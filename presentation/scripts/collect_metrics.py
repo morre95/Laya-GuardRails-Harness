@@ -12,6 +12,7 @@ from collections import Counter
 from pathlib import Path
 
 from lgh.config.loader import load_config
+from lgh.eval.labels import latest_labels
 from lgh.laya.questions import load_questions
 from lgh.paths import traces_dir, user_data_dir
 
@@ -62,12 +63,7 @@ def collect_traces() -> dict:
 
 
 def collect_labels(questions: dict) -> dict:
-    path = user_data_dir() / "labels.jsonl"
-    latest: dict[str, dict] = {}
-    for line in path.read_text().splitlines():
-        if line.strip():
-            label = json.loads(line)
-            latest[label["trace_id"]] = label
+    latest = latest_labels(user_data_dir())
     sources = Counter(label.get("source") for label in latest.values())
     distributions = {}
     for key, qdef in questions.items():
