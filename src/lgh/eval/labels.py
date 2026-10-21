@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import fcntl
 import json
 from pathlib import Path
 from typing import Any
 
 from lgh.paths import user_data_dir
+from lgh.state.redact import redact_text
 
 SOURCES = ("human", "frontier", "deterministic")
 HANDLING_VALUES = ("allow", "verify", "replan", "escalate")
@@ -49,6 +51,17 @@ def normalize_label(record: dict[str, Any]) -> dict[str, Any]:
     source = record.get("source")
     if source not in SOURCES:
         raise LabelError(f"source must be one of {SOURCES}")
+    if record.get("review_status") is not None:
+        reason = record.get("reason")
+        if (record["review_status"] != "insufficient_context" or source != "human"
+                or not isinstance(reason, str) or not reason.strip() or len(reason) > 1000):
+            raise LabelError("insufficient context requires a human reason of 1–1000 characters")
+        return {
+            "trace_id": trace_id,
+            "source": source,
+            "review_status": "insufficient_context",
+            "reason": redact_text(reason.strip()),
+        }
     handling = record.get("handling")
     if handling not in HANDLING_VALUES:
         raise LabelError(f"handling must be one of {HANDLING_VALUES}")
@@ -94,6 +107,7 @@ def append_labels(records: list[dict], directory: Path | None = None) -> list[di
     normalized = [normalize_label(record) for record in records]
     path = labels_path(directory)
     with path.open("a", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
         for row in normalized:
             handle.write(json.dumps(row) + "\n")
     return normalized
@@ -103,7 +117,7 @@ def append_label(record: dict, directory: Path | None = None) -> dict[str, Any]:
     return append_labels([record], directory=directory)[0]
 
 
-def load_labels(directory: Path | None = None) -> list[dict]:
+def _load_records(directory: Path | None = None) -> list[dict]:
     path = labels_path(directory)
     if not path.is_file():
         return []
@@ -112,6 +126,31 @@ def load_labels(directory: Path | None = None) -> list[dict]:
         if line.strip():
             rows.append(json.loads(line))
     return rows
+
+
+def load_review_exclusions(directory: Path | None = None) -> dict[str, dict]:
+    """Quality markers override older labels; a new complete label restores a case."""
+    return _exclusions(_load_records(directory))
+
+
+def _exclusions(records: list[dict]) -> dict[str, dict]:
+    excluded: dict[str, dict] = {}
+    for row in records:
+        trace_id = row.get("trace_id")
+        if not trace_id or row.get("source") == "laya":
+            continue
+        if row.get("review_status") == "insufficient_context":
+            excluded[trace_id] = row
+        else:
+            excluded.pop(trace_id, None)
+    return excluded
+
+
+def load_labels(directory: Path | None = None) -> list[dict]:
+    records = _load_records(directory)
+    excluded = _exclusions(records)
+    return [row for row in records
+            if not row.get("review_status") and row.get("trace_id") not in excluded]
 
 
 def latest_labels(directory: Path | None = None) -> dict[str, dict]:

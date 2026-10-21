@@ -42,6 +42,8 @@ def export_dataset(
             continue
         if lab.get("source") == "laya":
             continue
+        if lab.get("review_status") == "insufficient_context":
+            continue
         state = _state_payload(trace, envelopes)
         if state is None:
             continue

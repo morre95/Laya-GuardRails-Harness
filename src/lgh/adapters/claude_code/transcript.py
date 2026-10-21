@@ -45,7 +45,7 @@ def read_instruction_context(transcript_path: str | None) -> InstructionContext:
         else:
             message = payload
             role = payload.get('type') or payload.get('role')
-        if role not in {'user', 'human'}:
+        if role not in ('user', 'human'):
             continue
         text = _extract_text(message).strip()
         if text:
@@ -93,7 +93,7 @@ def _extract_text(payload: dict) -> str:
                 and isinstance(item.get('text'), str)
             )
         )
-    if isinstance(content, dict) and content.get('type') in {None, 'text'}:
+    if isinstance(content, dict) and content.get('type') in (None, 'text'):
         text = content.get('text')
         return text if isinstance(text, str) else ''
     return ''

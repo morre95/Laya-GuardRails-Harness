@@ -233,6 +233,39 @@ uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
 
 `lgh review` is a localhost labeling desk. It shows the stored `LayaState` and the seven questions. Completing a label writes `~/.local/share/lgh/labels.jsonl`. Check several traces (Shift-click for a range, or **Select visible**) and Save once to write the same values to all of them. Traces collected **before** this change have no state and cannot be labeled; new hook events can.
 
+New Claude Code hook events also capture redacted **user instructions** separately
+from tool results and the agent's plan. The latest four genuine user text messages
+are retained in chronological order, with up to 4,000 characters per message from
+the last 512 KB of the transcript. Generated metadata and compact summaries are
+excluded. This is a recent instruction window, not an inferred active-task boundary;
+missing earlier history and shortened text are flagged. The compact model goal
+shares its 400-character budget across the retained messages, so a reply such as
+"yes, continue" does not replace the preceding request by itself. The existing
+model token budget may shorten that goal further.
+
+The review page shows these instructions beside the proposed command, with visible
+definitions for every choice label. **Saved Laya input** expands the
+input in the same serialization used by inference and export, even when a hard
+rule handled the action without calling Laya. Additional source context is stored under `reviewContext` on
+new traces; it is redacted before truncation and limited to 8,000 characters per
+goal, command and plan. It does not contain tool outputs or entire source files,
+and it is not substituted into the model input during dataset export. Original
+line breaks are preserved in the source context. Older traces only show what was
+actually saved; missing text is never reconstructed from a later conversation.
+
+If the saved input does not support a reliable assessment, use **Cannot assess —
+missing or incorrect context**, write a reason and select **Mark insufficient
+context**. This affects the open case only, including when other rows are selected.
+It appends a human quality marker (`review_status: insufficient_context`) to
+`labels.jsonl`, rather than rewriting a trace or using the semantic label `unclear`.
+Marked cases are excluded from future dataset exports and calibration. Comparison
+runs using `--labels` also honor these markers. A new complete label restores a
+case; do that only when the saved model input is sufficient. Existing exported
+datasets and trained checkpoints are unchanged: export a new dataset to apply the
+exclusions, and keep any repaired inputs in a separately versioned dataset rather
+than modifying historical traces. Custom readers of `labels.jsonl` should use
+`lgh.eval.labels.load_labels` or `latest_labels` to respect quality markers.
+
 `lgh triage` ranks skipped and unlabeled traces by rule disposition (BLOCK/HUMAN/VERIFY), destructive/external/sensitive command patterns, and a weak bonus when Laya's shadow assessment flags risk. It prints score, trace id, status, command and the reasons; `--json` emits one object per line and `--min-score` drops weak candidates. Use it to find the rare `replan`/`escalate`/`irreversible` cases the dataset lacks. Laya's output only orders the list; it is never a label. The review UI shows the same score on each row (hover for reasons) and a **Time / Risk** toggle; with Risk on, Save moves to the next riskiest trace.
 
 `--propose` asks a teacher LLM to prefill the seven answers for the open unlabeled trace. `--teacher llm` is the only teacher in this version; `--propose` alone defaults to it. Suggestions fill the form and are **not** saved until you click Save (the stored label is still `source: human`). Uncheck **Ask LLM** in the UI to stop proposals without restarting. Set the model in **user** config (`~/.config/lgh/config.yaml`); a repo cannot retarget it:

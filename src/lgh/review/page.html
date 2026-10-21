@@ -116,7 +116,28 @@
     .risk.mid { color: var(--amber); }
     main { overflow: auto; padding: 22px 28px 96px; }
     .empty { color: var(--muted); max-width: 36em; }
-    .goal { font-size: 22px; margin: 0 0 8px; }
+    aside, main, .item .open, .context-grid > section, dl.kv dd { min-width: 0; }
+    .context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 18px; }
+    .context-grid h2 { font-size: 18px; margin: 0 0 10px; color: var(--amber); }
+    .source-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 16px; }
+    details { margin-bottom: 14px; }
+    summary { cursor: pointer; color: var(--sky); }
+    .seg label { flex: 1 1 180px; }
+    .seg small { display: block; font-size: 12px; margin-top: 5px; }
+    .seg label:focus-within { outline: 2px solid var(--sky); outline-offset: 2px; }
+    .quality-box { border: 1px solid var(--line); padding: 14px; margin-bottom: 20px; border-radius: 6px; }
+    .quality-box textarea { display: block; width: 100%; min-height: 4em; margin: 8px 0;
+      background: var(--bg); color: var(--ink); border: 1px solid var(--line); font: inherit; padding: 8px; }
+    .quality-box button { font: inherit; padding: 8px 12px; background: var(--paper); color: var(--amber);
+      border: 1px solid var(--amber); border-radius: 4px; cursor: pointer; }
+    .quality-error { color: var(--rose); }
+    @media (max-width: 1000px) { .context-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 700px) {
+      #app { grid-template-columns: 1fr; height: auto; }
+      aside { max-height: 35vh; }
+      main { padding: 18px 16px 40px; }
+      dl.kv { grid-template-columns: 80px 1fr; }
+    }
     .cmd {
       background: #0e0c0a;
       border: 1px solid var(--line);
@@ -154,7 +175,7 @@
       padding: 6px 10px;
       cursor: pointer;
     }
-    .seg input { display: none; }
+    .seg input { display: inline-block; accent-color: var(--amber); }
     .seg input:checked + span { color: var(--bg); }
     .seg label:has(input:checked) { background: var(--amber); border-color: var(--amber); color: var(--bg); }
     .noul { display: grid; grid-template-columns: 1fr 52px; gap: 10px; align-items: center; }
@@ -248,6 +269,7 @@
         ["labeled", "Labeled"],
         ["skipped", "Skipped"],
         ["no_state", "No state"],
+        ["insufficient_context", "Insufficient context"],
       ];
       $("counts").innerHTML = keys.map(([k, label]) =>
         `<button data-f="${k}" class="${filter === k ? "on" : ""}"><strong>${counts[k] || 0}</strong>${label}</button>`
@@ -417,7 +439,8 @@
           <div class="seg">
             ${opts.map((o) => `
               <label><input type="radio" name="${key}" value="${o}" ${selected === o ? "checked" : ""}>
-              <span>${o}</span></label>
+              <span>${o}</span>
+              <small>${escapeHtml(spec.criteria?.[o] || "")}</small></label>
             `).join("")}
           </div>
         </fieldset>`;
@@ -436,10 +459,72 @@
         </fieldset>`;
     }
 
+    function renderContext(data) {
+      const state = data.state;
+      const source = data.reviewContext;
+      const instructions = source?.instructions;
+      const messages = instructions?.messages || [];
+      const command = source?.command ?? state.action.command ?? state.action.target ?? "";
+      const warnings = [];
+      if (!source) warnings.push("Older trace: only the saved model input is available. Original instructions and unshortened command were not stored.");
+      if (!state.goal) warnings.push("The model input has no user goal.");
+      if (state.goal.includes("tool_result")) warnings.push("The saved goal may be a tool result instead of a user instruction.");
+      if (instructions?.history_truncated) warnings.push("Earlier user history is missing: only a recent window was captured. This is not a confirmed active-task boundary.");
+      if (instructions?.text_truncated || source?.truncated_fields?.length) warnings.push("Some source text was shortened when captured. Missing text cannot be expanded here.");
+      if (command !== (state.action.command ?? state.action.target ?? "") || state.goal.includes("…") || command.endsWith("…")) {
+        warnings.push("The model input is shortened. Compare it below before labeling.");
+      }
+      return `
+        ${warnings.map((text) => `<p class="warn">${escapeHtml(text)}</p>`).join("")}
+        <div class="context-grid">
+          <section aria-labelledby="instructions-heading">
+            <h2 id="instructions-heading">User instructions</h2>
+            <p class="hint">Captured before this action, oldest to newest. User text is separate from the agent's plan.</p>
+            ${messages.length ? messages.map((text, i) => `
+              <details open><summary>${messages.length === 1 ? "User instruction" : i === messages.length - 1 ? "Latest user instruction" : "Earlier user instruction " + (i + 1)}</summary>
+              <p class="source-text">${escapeHtml(text)}</p></details>
+            `).join("") : `<p class="hint">${source?.instructions ? "No user instruction was captured." : "Source user messages unavailable; saved goal shown below."}</p>`}
+            <details ${messages.length ? "" : "open"}><summary>Goal in Laya's input</summary>
+              <p class="source-text">${escapeHtml(state.goal || "(no goal)")}</p>
+            </details>
+          </section>
+          <section aria-labelledby="action-heading">
+            <h2 id="action-heading">Proposed action</h2>
+            <pre class="cmd mono">${escapeHtml(command)}</pre>
+            <details><summary>Agent plan (not a user instruction)</summary>
+              <p class="source-text">${escapeHtml(source?.plan ?? state.plan ?? "No plan was captured.")}</p>
+            </details>
+            <details><summary>Previous actions and repository</summary>
+              <dl class="kv">
+                <dt>repo</dt><dd>${escapeHtml(state.repo.branch || "?")} ${state.repo.dirty ? "dirty" : "clean"} · ${escapeHtml((state.repo.changed || []).join(", ") || "no changed files")}</dd>
+                <dt>recent</dt><dd class="source-text">${escapeHtml((state.recent || []).join("\n") || "No earlier actions in the model input.")}</dd>
+              </dl>
+            </details>
+          </section>
+        </div>
+        <details><summary>Saved Laya input (inference and export format)</summary>
+          <p class="hint">The input snapshot is stored even when a hard rule handles the action.</p>
+          <pre class="cmd mono">${escapeHtml(JSON.stringify(state, null, 2))}</pre>
+        </details>
+        <p class="hint">Label from the saved model input. If your answers require missing context, mark this case as insufficient context instead of guessing or choosing unclear.</p>
+        <details class="quality-box" ${data.quality ? "open" : ""}>
+          <summary>Cannot assess — missing or incorrect context</summary>
+          <p>Exclude this case from future dataset exports without changing the trace. This applies only to the open case, even when other rows are selected.</p>
+          <form id="quality-form">
+            <label for="quality-reason">What information is missing or incorrect?</label>
+            <textarea id="quality-reason" required maxlength="1000">${escapeHtml(data.quality?.reason || "")}</textarea>
+            <button type="submit">Mark insufficient context</button>
+            <p class="quality-error" id="quality-error" role="status"></p>
+          </form>
+          ${data.quality ? `<p class="hint">Currently excluded. Only save a complete label below if the saved input is sufficient; that restores the case.</p>` : ""}
+        </details>`;
+    }
+
     function renderDetail(data) {
       const q = data.questions || {};
       const lab = data.label || {};
       const state = data.state;
+      form = null;
       if (!state) {
         $("main").innerHTML = `
           <div class="warn">This trace has no stored LayaState. It was collected before the review UI. Skip it; only new hook events can be labeled.</div>
@@ -450,20 +535,14 @@
       }
       $("main").innerHTML = `
         <p class="mono" style="color:var(--muted)">${data.traceId}</p>
-        <h2 class="goal">${escapeHtml(state.goal || "(no goal)")}</h2>
         <div class="facts">
           <span class="chip">${escapeHtml(data.decision)}</span>
           <span class="chip">${escapeHtml(state.environment)}</span>
           <span class="chip">${escapeHtml(state.action.tool)} ${escapeHtml(state.action.operation)}</span>
           ${data.outcome ? `<span class="chip">exit ${data.outcome.exitCode ?? "?"}</span>` : ""}
-          ${data.rules?.length ? `<span class="chip">rules ${data.rules.join(", ")}</span>` : ""}
+          ${data.rules?.length ? `<span class="chip">rules ${escapeHtml(data.rules.join(", "))}</span>` : ""}
         </div>
-        <pre class="cmd mono">${escapeHtml(state.action.command || state.action.target || "")}</pre>
-        <dl class="kv">
-          <dt>plan</dt><dd>${escapeHtml(state.plan || "—")}</dd>
-          <dt>repo</dt><dd>${escapeHtml(state.repo.branch || "?")} ${state.repo.dirty ? "dirty" : "clean"} · ${(state.repo.changed || []).slice(0, 8).join(", ") || "no changed files"}</dd>
-          <dt>recent</dt><dd>${(state.recent || []).join(" → ") || "—"}</dd>
-        </dl>
+        ${renderContext(data)}
         <p class="hint">Do not copy Laya’s guess. Label what <em>you</em> would decide.</p>
         ${layaChip("handling", data.laya)}
         ${proposeEnabled && data.status === "unlabeled" ? `<p class="proposal" id="proposal">Asking teacher…</p>` : `<p class="proposal" id="proposal" hidden></p>`}
@@ -490,6 +569,22 @@
       });
       form.onsubmit = (e) => { e.preventDefault(); saveCurrent(); };
       $("skip").onclick = skipCurrent;
+      $("quality-form").onsubmit = async (event) => {
+        event.preventDefault();
+        const id = currentId;
+        try {
+          await api("/api/quality", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ trace_id: id, reason: $("quality-reason").value }),
+          });
+          selected.delete(id);
+          cancelProposal();
+          await reload(true);
+        } catch (error) {
+          $("quality-error").textContent = error.message;
+        }
+      };
       updateBulkButtons();
     }
 
@@ -629,7 +724,7 @@
         id = rows[0] && rows[0].traceId;
       }
       if (id) await openTrace(id);
-      else $("main").innerHTML = `<p class="empty">No traces in ${filter}. New actions appear here after the daemon+hooks run.</p>`;
+      else { form = null; currentId = null; $("main").innerHTML = `<p class="empty">No traces in ${filter}. New actions appear here after the daemon+hooks run.</p>`; }
     }
 
     function hideProposal() {

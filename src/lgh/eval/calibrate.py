@@ -66,7 +66,7 @@ def calibrate_from_traces(traces: list[DecisionTrace], labels: list[dict]) -> di
     labeled = {item["trace_id"]: item for item in labels}
     for trace in traces:
         lab = labeled.get(trace.trace_id)
-        if not lab or trace.laya is None:
+        if not lab or trace.laya is None or lab.get("review_status") == "insufficient_context":
             continue
         a = trace.laya.assessment
         mapping: dict[str, tuple[float, float | int | None]] = {

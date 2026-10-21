@@ -154,3 +154,22 @@ def test_cli_rejects_reused_dataset_before_loading_models(tmp_path, capsys):
                  "--training-dataset", str(path), "--output", str(output)]) == 1
     assert "data audit: reused" in capsys.readouterr().err
     assert not output.exists()
+
+
+def test_comparison_omits_cases_marked_insufficient_context(tmp_path):
+    path = tmp_path / 'test.jsonl'
+    labels = tmp_path / 'labels.jsonl'
+    write_rows(path, [make_row(0), make_row(1)])
+    write_rows(labels, [{'trace_id': 't0', 'source': 'human',
+                         'review_status': 'insufficient_context', 'reason': 'Missing goal'}])
+    assert [row['trace_id'] for row in read_dataset(path, labels=labels)] == ['t1']
+
+
+def test_comparison_reports_when_all_cases_are_excluded(tmp_path):
+    path = tmp_path / 'test.jsonl'
+    labels = tmp_path / 'labels.jsonl'
+    write_rows(path, [make_row(0)])
+    write_rows(labels, [{'trace_id': 't0', 'source': 'human',
+                         'review_status': 'insufficient_context', 'reason': 'Missing goal'}])
+    with pytest.raises(DatasetError, match='empty after context exclusions'):
+        read_dataset(path, labels=labels)

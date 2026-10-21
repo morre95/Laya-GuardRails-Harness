@@ -76,3 +76,12 @@ def test_large_transcript_reports_missing_earlier_history(tmp_path):
     context = read_instruction_context(str(path))
     assert context.messages == ['Latest clarification']
     assert context.history_truncated
+
+
+def test_invalid_role_and_block_type_are_ignored(tmp_path):
+    path = _transcript(tmp_path, [
+        {'role': [], 'content': 'Invalid role'},
+        {'role': 'user', 'content': {'type': {}, 'text': 'Invalid block'}},
+        {'role': 'user', 'content': 'Keep this request'},
+    ])
+    assert last_user_goal(path) == 'Keep this request'

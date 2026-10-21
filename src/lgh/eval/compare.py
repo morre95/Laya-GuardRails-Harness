@@ -39,6 +39,10 @@ def read_dataset(path: Path, *, labels: Path | None = None, unlabeled: bool = Fa
             if line.strip():
                 label = json.loads(line)
                 overrides[label["trace_id"]] = label
+    rows = [row for row in rows
+            if overrides.get(row.get("trace_id"), {}).get("review_status") != "insufficient_context"]
+    if not rows:
+        raise DatasetError("comparison dataset is empty after context exclusions")
     seen = set()
     questions = rows[0].get("questions")
     if not isinstance(questions, dict) or not questions:
