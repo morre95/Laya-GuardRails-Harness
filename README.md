@@ -208,6 +208,13 @@ Human approval is **approve this exact action once**. There is no "always allow"
 
 Anti-loop: 2 verification cycles and 2 replans per action, then frontier, then human.
 
+Known-command fast paths apply only to simple shell/Git actions. Compound shell
+syntax, redirection, command substitution, formatter writes, and recognized
+output-generating flags go through semantic assessment instead of inheriting an
+`ALLOW` from a safe-looking prefix. The configured test/lint/typecheck catalogs
+still assume trusted project commands and configuration; they are not a sandbox
+or proof that arbitrary test code is free of side effects.
+
 ## Tests and eval
 
 ```bash
@@ -319,9 +326,29 @@ USE_TF=0 uv run --extra laya lgh train \
   --device cuda
 ```
 
-Visa alla tillgängliga träningsflaggor med `uv run lgh train --help`. Inlärningshastighet, gradientackumulering och valideringsandel har för närvarande inga CLI-flaggor. En träningskörning sparar modellen; för att använda den i daemonen behöver du ange modellvägen enligt instruktionerna nedan.
+Visa alla tillgängliga träningsflaggor med `uv run lgh train --help`. Inlärningshastighet, gradientackumulering, tålamod och slumpfrö kan anges med `--lr-encoder`, `--lr-head`, `--grad-accumulation`, `--patience` och `--seed`. En träningskörning sparar modellen; för att använda den i daemonen behöver du ange modellvägen enligt instruktionerna nedan.
 
 Training minimizes log loss (a strictly proper scoring rule) against the human labels, so probabilities stay calibratable; `noul` labels are soft targets (`0.2` trains toward 20 %). The newest 20 % of rows by timestamp are held out for validation and early stopping. Afterwards one temperature per question type and option count is fitted on that split and written into the checkpoint.
+
+For a new experiment, supply separate validation and calibration datasets:
+
+```bash
+USE_TF=0 uv run --extra laya lgh train --dataset train.jsonl \
+  --validation validation.jsonl --calibration calibration.jsonl \
+  --base /path/to/current-laya --output ./comparisons/laya-next --device cuda
+```
+
+With `--validation`, every `--dataset` row is training data. Validation selects
+weights; `--calibration` alone fits temperatures. Exact states, trace IDs and
+declared `group_id`/`session_id` values cannot cross partitions. A chronological
+split alone does not prevent related-session leakage. Keep a fourth, untouched
+test set for final comparison. Without a separate calibration file, the legacy
+workflow reuses validation and reports its calibration scores as optimistic.
+`lgh compare` audits the separate files recorded in the candidate checkpoint too;
+retain those files at their recorded paths for the audit.
+
+See [the versioned Laya improvement experiment](experiments/laya_v2/README.md)
+for an auditable synthetic curriculum, training commands, and measured limitations.
 
 The checkpoint lands in `~/.local/share/lgh/models/<UTC time>/` in Laya's own layout, with `report.json` comparing the base and fine-tuned model on the validation split (accuracy, log loss, Brier, ECE, recall per class). Read the warnings first: a class with fewer than 10 training examples will not be learned, and a class with no validation examples cannot be measured. Rare `replan` / `escalate` / `outside_scope` / `irreversible` cases come from labeling `lgh triage` candidates, not from training longer.
 
