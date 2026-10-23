@@ -15,7 +15,7 @@ class: text-left
 
 <div class="kicker">VG-projekt · Laya Guardrail Harness</div>
 
-# Sju frågor, ett pass
+# Sju frågor, en körning
 
 Hur en liten beslutsmodell vaktar en AI-kodagent, och hur jag finjusterade den på egen data
 
