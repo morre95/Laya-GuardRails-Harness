@@ -7,6 +7,7 @@ Only the decision logits are trained; the act head is frozen because LGH does no
 from __future__ import annotations
 
 import os
+import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -29,6 +30,12 @@ class TrainSettings:
     grad_accumulation: int = 8
     patience: int = 1
     seed: int = 0
+
+    def __post_init__(self) -> None:
+        if self.epochs < 1 or self.grad_accumulation < 1 or self.patience < 0:
+            raise ValueError('epochs/accumulation must be positive and patience nonnegative')
+        if any(not math.isfinite(lr) or lr <= 0 for lr in (self.lr_encoder, self.lr_head)):
+            raise ValueError('learning rates must be finite and positive')
 
 
 def resolve_checkpoint_dir(model: str) -> str:
@@ -109,7 +116,9 @@ def _train_epoch(
     optimizer.zero_grad()
     for step, index in enumerate(order, start=1):
         loss = _log_loss(*_forward(agent, encoded[index]))
-        (loss / settings.grad_accumulation).backward()
+        window_start = ((step - 1) // settings.grad_accumulation) * settings.grad_accumulation
+        window_size = min(settings.grad_accumulation, len(order) - window_start)
+        (loss / window_size).backward()
         total += loss.item()
         if step % settings.grad_accumulation == 0 or step == len(order):
             optimizer.step()

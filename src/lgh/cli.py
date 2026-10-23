@@ -91,6 +91,13 @@ def main(argv: list[str] | None = None) -> int:
     train.add_argument("--output", type=Path, default=None, help="default: <data dir>/models/<UTC time>")
     train.add_argument("--base", default=None, help="base checkpoint (default: the stock Laya model)")
     train.add_argument("--epochs", type=int, default=4)
+    train.add_argument('--validation', type=Path, help='separate validation JSONL; --dataset is then training only')
+    train.add_argument('--calibration', type=Path, help='separate calibration JSONL; requires --validation')
+    train.add_argument('--lr-encoder', type=float, default=1e-5)
+    train.add_argument('--lr-head', type=float, default=1e-4)
+    train.add_argument('--grad-accumulation', type=int, default=8)
+    train.add_argument('--patience', type=int, default=1)
+    train.add_argument('--seed', type=int, default=0)
     train.add_argument("--device", default="cuda", help="torch device (cpu, cuda). 'gpu' is an alias for cuda.")
 
     review = sub.add_parser("review", help="Open a local UI for labeling traces")
@@ -308,9 +315,12 @@ def _train(args: argparse.Namespace) -> int:
             output,
             base=args.base or MODEL_ID,
             device=args.device,
-            settings=TrainSettings(epochs=args.epochs),
+            settings=TrainSettings(epochs=args.epochs, lr_encoder=args.lr_encoder, lr_head=args.lr_head,
+                                   grad_accumulation=args.grad_accumulation, patience=args.patience, seed=args.seed),
+            validation=args.validation,
+            calibration=args.calibration,
         )
-    except DatasetError as exc:
+    except (DatasetError, ValueError) as exc:
         print(f"dataset error: {exc}", file=sys.stderr)
         return 1
     print(summary_table(report))
