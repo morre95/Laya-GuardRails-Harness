@@ -1,0 +1,371 @@
+{
+  "source_report": "comparisons/slide28-validation/run-02/report/report.json",
+  "source_sha256": "4799a155ca531562e5dfd8eaab62a2f8d34ac0337662384d9cecb9aea234e4c7",
+  "validation_manifest": "comparisons/slide28-validation/manifest.json",
+  "validation_manifest_sha256": "379b7e9d3f36b7424865e77c94c1e742e77132f33cb5696a6bbd7951a27a6806",
+  "dataset_role": "reused_validation",
+  "comparison_kind": "model_only",
+  "rows": 266,
+  "purpose": "benchmark",
+  "mode": "labeled",
+  "selection": {
+    "status": "inconclusive",
+    "reason": "Exploratory model-only comparison; no independent model-selection claim."
+  },
+  "backends": {
+    "laya_current": {
+      "classes": {
+        "task_alignment": {
+          "aligned": {
+            "correct": 2,
+            "support": 24
+          },
+          "supporting": {
+            "correct": 82,
+            "support": 108
+          },
+          "unclear": {
+            "correct": 34,
+            "support": 132
+          },
+          "outside_scope": {
+            "correct": 0,
+            "support": 2
+          }
+        },
+        "destructive_risk": {
+          "false": {
+            "correct": 261,
+            "support": 261
+          },
+          "true": {
+            "correct": 0,
+            "support": 5
+          }
+        },
+        "sensitive_resource": {
+          "false": {
+            "correct": 261,
+            "support": 261
+          },
+          "true": {
+            "correct": 0,
+            "support": 5
+          }
+        },
+        "external_impact": {
+          "false": {
+            "correct": 258,
+            "support": 258
+          },
+          "true": {
+            "correct": 0,
+            "support": 8
+          }
+        },
+        "reversibility": {
+          "trivial": {
+            "correct": 207,
+            "support": 214
+          },
+          "recoverable": {
+            "correct": 10,
+            "support": 47
+          },
+          "difficult": {
+            "correct": 0,
+            "support": 5
+          },
+          "irreversible": {
+            "correct": 0,
+            "support": 0
+          }
+        },
+        "verification_needed": {
+          "false": {
+            "correct": 163,
+            "support": 165
+          },
+          "true": {
+            "correct": 11,
+            "support": 101
+          }
+        },
+        "handling": {
+          "allow": {
+            "correct": 149,
+            "support": 164
+          },
+          "verify": {
+            "correct": 25,
+            "support": 100
+          },
+          "replan": {
+            "correct": 0,
+            "support": 2
+          },
+          "escalate": {
+            "correct": 0,
+            "support": 0
+          }
+        }
+      },
+      "handling": {
+        "needed": 102,
+        "missed": 76,
+        "safe": 164,
+        "unnecessary": 15
+      },
+      "http_first_pass": {
+        "n": 266,
+        "p50_ms": 90.0402289998965,
+        "p95_ms": 135.2404384995225
+      },
+      "http_repeated_pass": {
+        "n": 532,
+        "p50_ms": 90.4039849997389,
+        "p95_ms": 135.20340675022453
+      },
+      "audit_status": "reused",
+      "device": "cuda",
+      "hardware": "NVIDIA RTX 3090",
+      "dataset_note": "Exact 266 human-labeled validation rows used for Laya early stopping and temperature calibration; not an independent holdout."
+    },
+    "laya_released": {
+      "classes": {
+        "task_alignment": {
+          "aligned": {
+            "correct": 12,
+            "support": 24
+          },
+          "supporting": {
+            "correct": 12,
+            "support": 108
+          },
+          "unclear": {
+            "correct": 11,
+            "support": 132
+          },
+          "outside_scope": {
+            "correct": 1,
+            "support": 2
+          }
+        },
+        "destructive_risk": {
+          "false": {
+            "correct": 243,
+            "support": 261
+          },
+          "true": {
+            "correct": 0,
+            "support": 5
+          }
+        },
+        "sensitive_resource": {
+          "false": {
+            "correct": 177,
+            "support": 261
+          },
+          "true": {
+            "correct": 0,
+            "support": 5
+          }
+        },
+        "external_impact": {
+          "false": {
+            "correct": 106,
+            "support": 258
+          },
+          "true": {
+            "correct": 5,
+            "support": 8
+          }
+        },
+        "reversibility": {
+          "trivial": {
+            "correct": 31,
+            "support": 214
+          },
+          "recoverable": {
+            "correct": 14,
+            "support": 47
+          },
+          "difficult": {
+            "correct": 1,
+            "support": 5
+          },
+          "irreversible": {
+            "correct": 0,
+            "support": 0
+          }
+        },
+        "verification_needed": {
+          "false": {
+            "correct": 35,
+            "support": 165
+          },
+          "true": {
+            "correct": 93,
+            "support": 101
+          }
+        },
+        "handling": {
+          "allow": {
+            "correct": 17,
+            "support": 164
+          },
+          "verify": {
+            "correct": 53,
+            "support": 100
+          },
+          "replan": {
+            "correct": 2,
+            "support": 2
+          },
+          "escalate": {
+            "correct": 0,
+            "support": 0
+          }
+        }
+      },
+      "handling": {
+        "needed": 102,
+        "missed": 11,
+        "safe": 164,
+        "unnecessary": 147
+      },
+      "http_first_pass": {
+        "n": 266,
+        "p50_ms": 92.1121315000164,
+        "p95_ms": 140.6411939994996
+      },
+      "http_repeated_pass": {
+        "n": 532,
+        "p50_ms": 92.00913850008874,
+        "p95_ms": 134.28219564998471
+      },
+      "audit_status": "unknown",
+      "device": "cuda",
+      "hardware": "NVIDIA RTX 3090",
+      "dataset_note": "Exact 266 human-labeled validation rows used for Laya early stopping and temperature calibration; not an independent holdout."
+    },
+    "kev": {
+      "classes": {
+        "task_alignment": {
+          "aligned": {
+            "correct": 4,
+            "support": 24
+          },
+          "supporting": {
+            "correct": 6,
+            "support": 108
+          },
+          "unclear": {
+            "correct": 109,
+            "support": 132
+          },
+          "outside_scope": {
+            "correct": 0,
+            "support": 2
+          }
+        },
+        "destructive_risk": {
+          "false": {
+            "correct": 257,
+            "support": 261
+          },
+          "true": {
+            "correct": 1,
+            "support": 5
+          }
+        },
+        "sensitive_resource": {
+          "false": {
+            "correct": 260,
+            "support": 261
+          },
+          "true": {
+            "correct": 1,
+            "support": 5
+          }
+        },
+        "external_impact": {
+          "false": {
+            "correct": 250,
+            "support": 258
+          },
+          "true": {
+            "correct": 2,
+            "support": 8
+          }
+        },
+        "reversibility": {
+          "trivial": {
+            "correct": 195,
+            "support": 214
+          },
+          "recoverable": {
+            "correct": 2,
+            "support": 47
+          },
+          "difficult": {
+            "correct": 0,
+            "support": 5
+          },
+          "irreversible": {
+            "correct": 0,
+            "support": 0
+          }
+        },
+        "verification_needed": {
+          "false": {
+            "correct": 165,
+            "support": 165
+          },
+          "true": {
+            "correct": 1,
+            "support": 101
+          }
+        },
+        "handling": {
+          "allow": {
+            "correct": 105,
+            "support": 164
+          },
+          "verify": {
+            "correct": 10,
+            "support": 100
+          },
+          "replan": {
+            "correct": 0,
+            "support": 2
+          },
+          "escalate": {
+            "correct": 0,
+            "support": 0
+          }
+        }
+      },
+      "handling": {
+        "needed": 102,
+        "missed": 67,
+        "safe": 164,
+        "unnecessary": 59
+      },
+      "http_first_pass": {
+        "n": 266,
+        "p50_ms": 224.97828799987474,
+        "p95_ms": 331.90970425005156
+      },
+      "http_repeated_pass": {
+        "n": 532,
+        "p50_ms": 219.30684950007162,
+        "p95_ms": 304.5762862999709
+      },
+      "audit_status": "unknown",
+      "device": "cuda",
+      "hardware": "NVIDIA RTX 3090",
+      "dataset_note": "Exact 266 human-labeled validation rows used for Laya early stopping and temperature calibration; not an independent holdout."
+    }
+  }
+}

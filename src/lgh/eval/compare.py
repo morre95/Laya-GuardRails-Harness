@@ -39,6 +39,26 @@ def read_dataset(path: Path, *, labels: Path | None = None, unlabeled: bool = Fa
             if line.strip():
                 label = json.loads(line)
                 overrides[label["trace_id"]] = label
+    def usable(row: dict) -> bool:
+        override = overrides.get(row.get('trace_id'))
+        if override and override.get('review_status') == 'insufficient_context':
+            return False
+        if row.get('review_status') != 'insufficient_context':
+            return True
+        # The established review contract allows a new complete independent label
+        # to restore a case. An empty/partial override must not erase the marker.
+        if not override or override.get('source') not in ('human', 'frontier', 'deterministic'):
+            return False
+        try:
+            for key, qdef in row['questions'].items():
+                question_target(qdef, override.get(key))
+        except DatasetError:
+            return False
+        return True
+
+    rows = [row for row in rows if usable(row)]
+    if not rows:
+        raise DatasetError("comparison dataset is empty after context exclusions")
     seen = set()
     questions = rows[0].get("questions")
     if not isinstance(questions, dict) or not questions:
@@ -84,16 +104,30 @@ def audit_dataset(rows: list[dict], training_dataset: Path | None, metadata: dic
     if expected and digest != expected:
         raise DatasetError("--training-dataset does not match the checkpoint's dataset_sha256")
     used = load_rows(training_dataset)
+    supplemental = {}
+    for name in ('validation', 'calibration'):
+        item = metadata.get('datasets', {}).get(name)
+        if item is None:
+            continue
+        path = Path(item['path'])
+        if not path.is_file() or file_hash(path) != item['sha256']:
+            raise DatasetError(f'{name} dataset missing or changed: {path}; cannot establish independence')
+        supplemental[name] = item['sha256']
+        used.extend(load_rows(path))
     ids = {r.get("trace_id") for r in used}
     states = {state_hash(r) for r in used}
+    groups = {(key, r[key]) for r in used for key in ('group_id', 'session_id') if r.get(key)}
     result.update(
         training_dataset_sha256=digest,
         matches_checkpoint=bool(expected),
         overlap_ids=[r["trace_id"] for r in rows if r["trace_id"] in ids],
         overlap_states=[r["trace_id"] for r in rows if state_hash(r) in states],
+        overlap_groups=[r['trace_id'] for r in rows
+                        if any((key, r.get(key)) in groups for key in ('group_id', 'session_id'))],
+        supplemental_datasets=supplemental,
     )
     result["status"] = (
-        "reused" if result["overlap_ids"] or result["overlap_states"]
+        "reused" if result["overlap_ids"] or result["overlap_states"] or result['overlap_groups']
         else "no_exact_overlap" if expected else "unverified_training_dataset"
     )
     return result
@@ -257,8 +291,9 @@ def run_comparison(
     notes = [
         "Inference only; no training, early stopping or calibration is fitted on this dataset.",
         "Checkpoints use their saved calibration. Metrics evaluate Laya, not the full rules/policy pipeline.",
-        "Overlap audit checks trace IDs and exact states against the supplied full training/validation dataset. "
-        "Near-duplicates, shared sessions and earlier fine-tuning datasets are not checked.",
+        "Overlap audit checks trace IDs, exact states and declared groups/sessions against training and "
+        "separate validation/calibration files recorded in the checkpoint. Near-duplicates without group "
+        "metadata and earlier fine-tuning datasets are not checked.",
         "Recall uses reference noul >= 0.5; predictions use argmax (a 0.5 tie selects false). "
         "Log loss and Brier retain soft reference labels.",
         "Latency excludes one warmup per checkpoint; sequential runs are not a controlled hardware benchmark.",

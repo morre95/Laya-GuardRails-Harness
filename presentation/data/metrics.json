@@ -1,0 +1,625 @@
+{
+ "traces": {
+  "decisions": 3008,
+  "with_state": 2602,
+  "per_day": [
+   {
+    "label": "2026-09-20",
+    "value": 105
+   },
+   {
+    "label": "2026-09-21",
+    "value": 393
+   },
+   {
+    "label": "2026-09-22",
+    "value": 425
+   },
+   {
+    "label": "2026-09-23",
+    "value": 284
+   },
+   {
+    "label": "2026-09-24",
+    "value": 204
+   },
+   {
+    "label": "2026-09-25",
+    "value": 237
+   },
+   {
+    "label": "2026-09-26",
+    "value": 95
+   },
+   {
+    "label": "2026-09-27",
+    "value": 263
+   },
+   {
+    "label": "2026-09-28",
+    "value": 83
+   },
+   {
+    "label": "2026-09-29",
+    "value": 289
+   },
+   {
+    "label": "2026-09-30",
+    "value": 55
+   },
+   {
+    "label": "2026-10-01",
+    "value": 53
+   },
+   {
+    "label": "2026-10-02",
+    "value": 31
+   },
+   {
+    "label": "2026-10-04",
+    "value": 17
+   },
+   {
+    "label": "2026-10-05",
+    "value": 65
+   },
+   {
+    "label": "2026-10-06",
+    "value": 42
+   },
+   {
+    "label": "2026-10-07",
+    "value": 41
+   },
+   {
+    "label": "2026-10-12",
+    "value": 84
+   },
+   {
+    "label": "2026-10-13",
+    "value": 4
+   },
+   {
+    "label": "2026-10-14",
+    "value": 1
+   },
+   {
+    "label": "2026-10-16",
+    "value": 4
+   },
+   {
+    "label": "2026-10-17",
+    "value": 233
+   }
+  ],
+  "final_decisions": {
+   "FRONTIER_REVIEW": 1973,
+   "HUMAN_APPROVAL": 532,
+   "REPLAN": 277,
+   "ALLOW": 225,
+   "BLOCK": 1
+  },
+  "laya_latency_ms": {
+   "n": 2401,
+   "p50": 100.17306600093434,
+   "p95": 169.9414729991986
+  }
+ },
+ "labels": {
+  "traces": 1331,
+  "sources": {
+   "human": 1331
+  },
+  "distributions": {
+   "task_alignment": {
+    "aligned": 201,
+    "supporting": 688,
+    "unclear": 440,
+    "outside_scope": 2
+   },
+   "destructive_risk": {
+    "false": 1298,
+    "true": 33
+   },
+   "sensitive_resource": {
+    "false": 1281,
+    "true": 50
+   },
+   "external_impact": {
+    "false": 1299,
+    "true": 32
+   },
+   "reversibility": {
+    "trivial": 1081,
+    "recoverable": 233,
+    "difficult": 16,
+    "irreversible": 1
+   },
+   "verification_needed": {
+    "false": 1021,
+    "true": 310
+   },
+   "handling": {
+    "allow": 1018,
+    "verify": 309,
+    "replan": 3,
+    "escalate": 1
+   }
+  }
+ },
+ "training": {
+  "base": "convaiinnovations/laya-typed-decisions",
+  "trained_at": "2026-10-12T16:59:31.231Z",
+  "rows": {
+   "train": 1065,
+   "val": 266
+  },
+  "settings": {
+   "epochs": 4,
+   "lr_encoder": 1e-05,
+   "lr_head": 0.0001,
+   "grad_accumulation": 8,
+   "patience": 1,
+   "seed": 0
+  },
+  "history": [
+   {
+    "epoch": 0,
+    "val_loss": 1.043507004142704
+   },
+   {
+    "epoch": 1,
+    "train_loss": 0.4652073754076387,
+    "val_loss": 0.5348852871167928
+   },
+   {
+    "epoch": 2,
+    "train_loss": 0.3687345253364861,
+    "val_loss": 0.5503346116415092
+   },
+   {
+    "epoch": 3,
+    "train_loss": 0.28989898842003003,
+    "val_loss": 0.5736712969671515
+   }
+  ],
+  "temperatures": {
+   "choice:3-5": 1.4,
+   "noul:2": 1.05
+  },
+  "warnings": [
+   "task_alignment=outside_scope: 0 training examples (< 10); expect it not to be learned",
+   "reversibility=irreversible: 1 training examples (< 10); expect it not to be learned",
+   "reversibility=irreversible: no validation examples; its accuracy cannot be measured",
+   "handling=replan: 1 training examples (< 10); expect it not to be learned",
+   "handling=escalate: 1 training examples (< 10); expect it not to be learned",
+   "handling=escalate: no validation examples; its accuracy cannot be measured"
+  ],
+  "support": {
+   "train": {
+    "task_alignment": {
+     "aligned": 177,
+     "supporting": 580,
+     "unclear": 308,
+     "outside_scope": 0
+    },
+    "destructive_risk": {
+     "false": 1037,
+     "true": 28
+    },
+    "sensitive_resource": {
+     "false": 1020,
+     "true": 45
+    },
+    "external_impact": {
+     "false": 1041,
+     "true": 24
+    },
+    "reversibility": {
+     "trivial": 867,
+     "recoverable": 186,
+     "difficult": 11,
+     "irreversible": 1
+    },
+    "verification_needed": {
+     "false": 856,
+     "true": 209
+    },
+    "handling": {
+     "allow": 854,
+     "verify": 209,
+     "replan": 1,
+     "escalate": 1
+    }
+   },
+   "val": {
+    "task_alignment": {
+     "aligned": 24,
+     "supporting": 108,
+     "unclear": 132,
+     "outside_scope": 2
+    },
+    "destructive_risk": {
+     "false": 261,
+     "true": 5
+    },
+    "sensitive_resource": {
+     "false": 261,
+     "true": 5
+    },
+    "external_impact": {
+     "false": 258,
+     "true": 8
+    },
+    "reversibility": {
+     "trivial": 214,
+     "recoverable": 47,
+     "difficult": 5,
+     "irreversible": 0
+    },
+    "verification_needed": {
+     "false": 165,
+     "true": 101
+    },
+    "handling": {
+     "allow": 164,
+     "verify": 100,
+     "replan": 2,
+     "escalate": 0
+    }
+   }
+  },
+  "metrics": {
+   "base": {
+    "task_alignment": {
+     "n": 266,
+     "accuracy": 0.13533834586466165,
+     "log_loss": 1.4415360885348831,
+     "brier": 0.777136955037594,
+     "ece": 0.16489210526315787,
+     "recall": {
+      "aligned": {
+       "support": 24,
+       "correct": 12
+      },
+      "supporting": {
+       "support": 108,
+       "correct": 12
+      },
+      "unclear": {
+       "support": 132,
+       "correct": 11
+      },
+      "outside_scope": {
+       "support": 2,
+       "correct": 1
+      }
+     }
+    },
+    "destructive_risk": {
+     "n": 266,
+     "accuracy": 0.9135338345864662,
+     "log_loss": 0.5298217033796911,
+     "brier": 0.2620072356390977,
+     "ece": 0.30100000000000005,
+     "recall": {
+      "false": {
+       "support": 261,
+       "correct": 243
+      },
+      "true": {
+       "support": 5,
+       "correct": 0
+      }
+     }
+    },
+    "sensitive_resource": {
+     "n": 266,
+     "accuracy": 0.6654135338345865,
+     "log_loss": 0.6618776835486608,
+     "brier": 0.4219766216541353,
+     "ece": 0.10442481203007517,
+     "recall": {
+      "false": {
+       "support": 261,
+       "correct": 177
+      },
+      "true": {
+       "support": 5,
+       "correct": 0
+      }
+     }
+    },
+    "external_impact": {
+     "n": 266,
+     "accuracy": 0.41729323308270677,
+     "log_loss": 0.7511222536852165,
+     "brier": 0.5273752931578948,
+     "ece": 0.13713195488721805,
+     "recall": {
+      "false": {
+       "support": 258,
+       "correct": 106
+      },
+      "true": {
+       "support": 8,
+       "correct": 5
+      }
+     }
+    },
+    "reversibility": {
+     "n": 266,
+     "accuracy": 0.17293233082706766,
+     "log_loss": 1.4850302244581413,
+     "brier": 0.7948848404887218,
+     "ece": 0.12137932330827068,
+     "recall": {
+      "trivial": {
+       "support": 214,
+       "correct": 31
+      },
+      "recoverable": {
+       "support": 47,
+       "correct": 14
+      },
+      "difficult": {
+       "support": 5,
+       "correct": 1
+      },
+      "irreversible": {
+       "support": 0,
+       "correct": 0
+      }
+     }
+    },
+    "verification_needed": {
+     "n": 266,
+     "accuracy": 0.48120300751879697,
+     "log_loss": 0.7318842302130486,
+     "brier": 0.3722747917293233,
+     "ece": 0.08414586466165411,
+     "recall": {
+      "false": {
+       "support": 165,
+       "correct": 35
+      },
+      "true": {
+       "support": 101,
+       "correct": 93
+      }
+     }
+    },
+    "handling": {
+     "n": 266,
+     "accuracy": 0.2706766917293233,
+     "log_loss": 1.450601730905701,
+     "brier": 0.7776792454511278,
+     "ece": 0.025689849624060148,
+     "recall": {
+      "allow": {
+       "support": 164,
+       "correct": 17
+      },
+      "verify": {
+       "support": 100,
+       "correct": 53
+      },
+      "replan": {
+       "support": 2,
+       "correct": 2
+      },
+      "escalate": {
+       "support": 0,
+       "correct": 0
+      }
+     }
+    }
+   },
+   "fine_tuned": {
+    "task_alignment": {
+     "n": 266,
+     "accuracy": 0.44360902255639095,
+     "log_loss": 1.1166023157509946,
+     "brier": 0.6531489454511278,
+     "ece": 0.04605902255639099,
+     "recall": {
+      "aligned": {
+       "support": 24,
+       "correct": 2
+      },
+      "supporting": {
+       "support": 108,
+       "correct": 82
+      },
+      "unclear": {
+       "support": 132,
+       "correct": 34
+      },
+      "outside_scope": {
+       "support": 2,
+       "correct": 0
+      }
+     }
+    },
+    "destructive_risk": {
+     "n": 266,
+     "accuracy": 0.981203007518797,
+     "log_loss": 0.24528671195969967,
+     "brier": 0.04448979812030075,
+     "ece": 0.06589812030075186,
+     "recall": {
+      "false": {
+       "support": 261,
+       "correct": 261
+      },
+      "true": {
+       "support": 5,
+       "correct": 0
+      }
+     }
+    },
+    "sensitive_resource": {
+     "n": 266,
+     "accuracy": 0.981203007518797,
+     "log_loss": 0.1916616245904886,
+     "brier": 0.042626765939849626,
+     "ece": 0.06401165413533835,
+     "recall": {
+      "false": {
+       "support": 261,
+       "correct": 261
+      },
+      "true": {
+       "support": 5,
+       "correct": 0
+      }
+     }
+    },
+    "external_impact": {
+     "n": 266,
+     "accuracy": 0.9699248120300752,
+     "log_loss": 0.14195366836080772,
+     "brier": 0.03406249105263158,
+     "ece": 0.021922932330827004,
+     "recall": {
+      "false": {
+       "support": 258,
+       "correct": 258
+      },
+      "true": {
+       "support": 8,
+       "correct": 0
+      }
+     }
+    },
+    "reversibility": {
+     "n": 266,
+     "accuracy": 0.8157894736842105,
+     "log_loss": 0.5659711697398845,
+     "brier": 0.3257980111654135,
+     "ece": 0.08816278195488718,
+     "recall": {
+      "trivial": {
+       "support": 214,
+       "correct": 207
+      },
+      "recoverable": {
+       "support": 47,
+       "correct": 10
+      },
+      "difficult": {
+       "support": 5,
+       "correct": 0
+      },
+      "irreversible": {
+       "support": 0,
+       "correct": 0
+      }
+     }
+    },
+    "verification_needed": {
+     "n": 266,
+     "accuracy": 0.6541353383458647,
+     "log_loss": 0.6678337041499491,
+     "brier": 0.2780341729323308,
+     "ece": 0.1486624060150376,
+     "recall": {
+      "false": {
+       "support": 165,
+       "correct": 163
+      },
+      "true": {
+       "support": 101,
+       "correct": 11
+      }
+     }
+    },
+    "handling": {
+     "n": 266,
+     "accuracy": 0.6541353383458647,
+     "log_loss": 0.7234832655510918,
+     "brier": 0.4763305644736842,
+     "ece": 0.09799812030075193,
+     "recall": {
+      "allow": {
+       "support": 164,
+       "correct": 149
+      },
+      "verify": {
+       "support": 100,
+       "correct": 25
+      },
+      "replan": {
+       "support": 2,
+       "correct": 0
+      },
+      "escalate": {
+       "support": 0,
+       "correct": 0
+      }
+     }
+    }
+   }
+  },
+  "majority_baseline": {
+   "task_alignment": {
+    "class": "supporting",
+    "accuracy": 0.40601503759398494
+   },
+   "destructive_risk": {
+    "class": "false",
+    "accuracy": 0.981203007518797
+   },
+   "sensitive_resource": {
+    "class": "false",
+    "accuracy": 0.981203007518797
+   },
+   "external_impact": {
+    "class": "false",
+    "accuracy": 0.9699248120300752
+   },
+   "reversibility": {
+    "class": "trivial",
+    "accuracy": 0.8045112781954887
+   },
+   "verification_needed": {
+    "class": "false",
+    "accuracy": 0.6203007518796992
+   },
+   "handling": {
+    "class": "allow",
+    "accuracy": 0.6165413533834586
+   }
+  }
+ },
+ "comparison": {
+  "name": "20261017-unseen",
+  "created_at": "2026-10-17T09:39:58.563Z",
+  "rows": 9,
+  "mode": "unlabeled",
+  "device": "cpu",
+  "audit_status": "no_exact_overlap",
+  "matches_checkpoint": true,
+  "disagreements": {
+   "task_alignment": 8,
+   "destructive_risk": 1,
+   "sensitive_resource": 0,
+   "external_impact": 6,
+   "reversibility": 8,
+   "verification_needed": 6,
+   "handling": 9
+  },
+  "metrics": null
+ },
+ "laya_config": {
+  "timeout_seconds": 3.0,
+  "thresholds": {
+   "confidence": 0.8,
+   "destructive": 0.85,
+   "sensitive": 0.85,
+   "external_impact": 0.85,
+   "verification": 0.7
+  }
+ },
+ "frontier_timeout_seconds": 20.0
+}

@@ -15,6 +15,7 @@ from lgh.train.data import (
     load_rows,
     question_target,
     support_warnings,
+    assert_disjoint,
 )
 from lgh.train.evaluate import fit_bucket_temperatures, score_question
 from tests.helpers import make_envelope
@@ -100,6 +101,50 @@ def test_load_rows_requires_timestamp(tmp_path) -> None:
     write_rows(path, [row])
     with pytest.raises(DatasetError, match="re-run `lgh export-dataset`"):
         load_rows(path)
+
+
+@pytest.mark.parametrize('value', [-0.1, 1.1, float('nan'), float('inf'), None, 'bad'])
+def test_rejects_invalid_probability_targets(value):
+    with pytest.raises(DatasetError):
+        question_target(QUESTIONS['destructive_risk'], value)
+
+
+@pytest.mark.parametrize('change', [
+    {'source': 'unknown'}, {'labels': {'handling': 'allow'}},
+    {'review_status': 'insufficient_context'}, {'state': ''},
+])
+def test_rejects_unusable_training_rows(tmp_path, change):
+    path = tmp_path / 'data.jsonl'
+    write_rows(path, [{**make_row(0), **change}])
+    with pytest.raises(DatasetError):
+        load_rows(path)
+
+
+@pytest.mark.parametrize('row', [None, [], {**make_row(0), 'trace_id': []},
+    {**make_row(0), 'state': {'unrelated': 'no context'}},
+    {**make_row(0), 'questions': {'handling': None}},
+    {**make_row(0), 'timestamp': ['bad']}, {**make_row(0), 'group_id': ['bad']},
+    {**make_row(0), 'questions': {'handling': {'type': 'choice'}}},
+])
+def test_malformed_rows_raise_dataset_error(tmp_path, row):
+    path = tmp_path / 'data.jsonl'
+    write_rows(path, [row])
+    with pytest.raises(DatasetError):
+        load_rows(path)
+
+
+@pytest.mark.parametrize('overlap', ['trace_id', 'state', 'group_id', 'session_id'])
+def test_split_audit_rejects_overlap(overlap):
+    a, b = make_row(0), make_row(1)
+    if overlap in ('group_id', 'session_id'):
+        a[overlap] = 'same-family'
+    b[overlap] = a[overlap]
+    with pytest.raises(DatasetError, match='overlap'):
+        assert_disjoint({'train': [a], 'validation': [b]})
+
+
+def test_split_audit_accepts_distinct_cases():
+    assert_disjoint({'train': [make_row(0)], 'validation': [make_row(1)]})
 
 
 def test_score_question_choice_accuracy_and_recall() -> None:

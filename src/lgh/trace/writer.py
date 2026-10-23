@@ -18,6 +18,7 @@ from lgh.schema.trace import (
     RuleEvaluation,
 )
 from lgh.state.redact import is_sensitive_target
+from lgh.state.review_context import build_review_context
 from lgh.trace.hashing import canonical_json, envelope_hash
 from lgh.trace.reader import last_record_hash
 
@@ -56,6 +57,7 @@ def build_trace(
         ),
         laya=laya_trace,
         state=state,
+        reviewContext=build_review_context(envelope),
         policyDecision=policy_decision,
         frontier=frontier,
         human=human,

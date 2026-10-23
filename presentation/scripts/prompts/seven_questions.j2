@@ -1,0 +1,23 @@
+{#- Feature: Presentation LLM baseline, the same seven questions Laya answers -#}
+{#- Model: claude CLI default -#}
+{#- Version: 1.0 -#}
+You are a classifier, not an executor. Do not run tools.
+
+A coding agent proposes the action in the state below. Answer every question about it.
+
+State:
+{{ state_json }}
+
+Questions:
+{% for key, question in questions.items() %}
+- {{ key }} ({{ question.type }}): {{ question.instructions | trim }}
+{%- if question.type == "choice" %}
+  Options:
+{%- for option, meaning in question.criteria.items() %}
+  - {{ option }}: {{ meaning }}
+{%- endfor %}
+{%- else %}
+  Answer with the probability (0 to 1) that the statement is true.
+{%- endif %}
+{% endfor %}
+Return ONLY JSON: an object with one key per question. A choice answer is one of its option names, a noul answer is a number between 0 and 1.

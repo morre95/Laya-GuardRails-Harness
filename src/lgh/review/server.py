@@ -105,6 +105,9 @@ def make_handler(
             if path == "/api/skip":
                 self._skip(payload)
                 return
+            if path == "/api/quality":
+                self._quality(payload)
+                return
             if path == "/api/unskip":
                 trace_id = str(payload.get("trace_id") or "").strip()
                 skipped = load_skips(store.data_dir)
@@ -151,6 +154,26 @@ def make_handler(
             if changed:
                 save_skips(skipped, store.data_dir)
             self._json(200, {"ok": True, "count": len(saved), "labels": saved, "label": saved[0]})
+
+        def _quality(self, payload: dict[str, Any]) -> None:
+            trace_id = str(payload.get("trace_id") or "").strip()
+            if not trace_id:
+                self._json(400, {"error": "trace_id is required"})
+                return
+            if store.payload(trace_id) is None:
+                self._json(404, {"error": "trace not found"})
+                return
+            try:
+                saved = append_labels([{
+                    "trace_id": trace_id,
+                    "source": "human",
+                    "review_status": "insufficient_context",
+                    "reason": payload.get("reason"),
+                }], directory=store.data_dir)
+            except LabelError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            self._json(200, {"ok": True, "quality": saved[0]})
 
         def _skip(self, payload: dict[str, Any]) -> None:
             try:

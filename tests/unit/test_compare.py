@@ -47,6 +47,26 @@ def test_audit_requires_the_original_training_export(tmp_path):
     assert audit_dataset([make_row(1)], None, {})["status"] == "unknown"
 
 
+def test_audit_includes_separate_validation_and_calibration(tmp_path):
+    train, cal = tmp_path / 'train.jsonl', tmp_path / 'cal.jsonl'
+    write_rows(train, [make_row(0)])
+    write_rows(cal, [make_row(1)])
+    metadata = {'dataset_sha256': file_hash(train), 'datasets': {
+        'calibration': {'path': str(cal), 'sha256': file_hash(cal)}}}
+    assert audit_dataset([make_row(1)], train, metadata)['status'] == 'reused'
+    cal.unlink()
+    with pytest.raises(DatasetError, match='calibration'):
+        audit_dataset([make_row(2)], train, metadata)
+
+
+def test_audit_rejects_family_overlap(tmp_path):
+    train = tmp_path / 'train.jsonl'
+    write_rows(train, [{**make_row(0), 'group_id': 'family'}])
+    test = {**make_row(1), 'group_id': 'family'}
+    result = audit_dataset([test], train, {'dataset_sha256': file_hash(train)})
+    assert result['status'] == 'reused'
+
+
 def test_dataset_requires_independent_complete_labels(tmp_path):
     path = tmp_path / "test.jsonl"
     row = {**make_row(0), "source": "laya"}
@@ -59,6 +79,23 @@ def test_dataset_requires_independent_complete_labels(tmp_path):
     write_rows(path, [make_row(0, destructive_risk=float("nan"))])
     with pytest.raises(DatasetError, match="invalid label"):
         read_dataset(path)
+
+
+def test_row_context_exclusions_apply_without_an_override_file(tmp_path):
+    path = tmp_path / 'test.jsonl'
+    write_rows(path, [{**make_row(0), 'review_status': 'insufficient_context'}, make_row(1)])
+    assert [r['trace_id'] for r in read_dataset(path)] == ['t1']
+
+
+@pytest.mark.parametrize('unlabeled', [False, True])
+def test_only_complete_valid_override_restores_row_context(tmp_path, unlabeled):
+    path, labels = tmp_path / 'test.jsonl', tmp_path / 'labels.jsonl'
+    row = {**make_row(0), 'review_status': 'insufficient_context'}
+    write_rows(path, [row, make_row(1)])
+    write_rows(labels, [{'trace_id': 't0', 'source': 'human', 'handling': 'allow'}])
+    assert [r['trace_id'] for r in read_dataset(path, labels=labels, unlabeled=unlabeled)] == ['t1']
+    write_rows(labels, [{'trace_id': 't0', 'source': 'human', **row['labels']}])
+    assert [r['trace_id'] for r in read_dataset(path, labels=labels, unlabeled=unlabeled)] == ['t0', 't1']
 
 
 def test_dataset_rejects_duplicate_traces_and_loads_latest_reference(tmp_path):
@@ -154,3 +191,22 @@ def test_cli_rejects_reused_dataset_before_loading_models(tmp_path, capsys):
                  "--training-dataset", str(path), "--output", str(output)]) == 1
     assert "data audit: reused" in capsys.readouterr().err
     assert not output.exists()
+
+
+def test_comparison_omits_cases_marked_insufficient_context(tmp_path):
+    path = tmp_path / 'test.jsonl'
+    labels = tmp_path / 'labels.jsonl'
+    write_rows(path, [make_row(0), make_row(1)])
+    write_rows(labels, [{'trace_id': 't0', 'source': 'human',
+                         'review_status': 'insufficient_context', 'reason': 'Missing goal'}])
+    assert [row['trace_id'] for row in read_dataset(path, labels=labels)] == ['t1']
+
+
+def test_comparison_reports_when_all_cases_are_excluded(tmp_path):
+    path = tmp_path / 'test.jsonl'
+    labels = tmp_path / 'labels.jsonl'
+    write_rows(path, [make_row(0)])
+    write_rows(labels, [{'trace_id': 't0', 'source': 'human',
+                         'review_status': 'insufficient_context', 'reason': 'Missing goal'}])
+    with pytest.raises(DatasetError, match='empty after context exclusions'):
+        read_dataset(path, labels=labels)

@@ -208,6 +208,13 @@ Human approval is **approve this exact action once**. There is no "always allow"
 
 Anti-loop: 2 verification cycles and 2 replans per action, then frontier, then human.
 
+Known-command fast paths apply only to simple shell/Git actions. Compound shell
+syntax, redirection, command substitution, formatter writes, and recognized
+output-generating flags go through semantic assessment instead of inheriting an
+`ALLOW` from a safe-looking prefix. The configured test/lint/typecheck catalogs
+still assume trusted project commands and configuration; they are not a sandbox
+or proof that arbitrary test code is free of side effects.
+
 ## Tests and eval
 
 ```bash
@@ -232,6 +239,39 @@ uv run lgh export-dataset --output /tmp/lgh-dataset.jsonl
 ```
 
 `lgh review` is a localhost labeling desk. It shows the stored `LayaState` and the seven questions. Completing a label writes `~/.local/share/lgh/labels.jsonl`. Check several traces (Shift-click for a range, or **Select visible**) and Save once to write the same values to all of them. Traces collected **before** this change have no state and cannot be labeled; new hook events can.
+
+New Claude Code hook events also capture redacted **user instructions** separately
+from tool results and the agent's plan. The latest four genuine user text messages
+are retained in chronological order, with up to 4,000 characters per message from
+the last 512 KB of the transcript. Generated metadata and compact summaries are
+excluded. This is a recent instruction window, not an inferred active-task boundary;
+missing earlier history and shortened text are flagged. The compact model goal
+shares its 400-character budget across the retained messages, so a reply such as
+"yes, continue" does not replace the preceding request by itself. The existing
+model token budget may shorten that goal further.
+
+The review page shows these instructions beside the proposed command, with visible
+definitions for every choice label. **Saved Laya input** expands the
+input in the same serialization used by inference and export, even when a hard
+rule handled the action without calling Laya. Additional source context is stored under `reviewContext` on
+new traces; it is redacted before truncation and limited to 8,000 characters per
+goal, command and plan. It does not contain tool outputs or entire source files,
+and it is not substituted into the model input during dataset export. Original
+line breaks are preserved in the source context. Older traces only show what was
+actually saved; missing text is never reconstructed from a later conversation.
+
+If the saved input does not support a reliable assessment, use **Cannot assess —
+missing or incorrect context**, write a reason and select **Mark insufficient
+context**. This affects the open case only, including when other rows are selected.
+It appends a human quality marker (`review_status: insufficient_context`) to
+`labels.jsonl`, rather than rewriting a trace or using the semantic label `unclear`.
+Marked cases are excluded from future dataset exports and calibration. Comparison
+runs using `--labels` also honor these markers. A new complete label restores a
+case; do that only when the saved model input is sufficient. Existing exported
+datasets and trained checkpoints are unchanged: export a new dataset to apply the
+exclusions, and keep any repaired inputs in a separately versioned dataset rather
+than modifying historical traces. Custom readers of `labels.jsonl` should use
+`lgh.eval.labels.load_labels` or `latest_labels` to respect quality markers.
 
 `lgh triage` ranks skipped and unlabeled traces by rule disposition (BLOCK/HUMAN/VERIFY), destructive/external/sensitive command patterns, and a weak bonus when Laya's shadow assessment flags risk. It prints score, trace id, status, command and the reasons; `--json` emits one object per line and `--min-score` drops weak candidates. Use it to find the rare `replan`/`escalate`/`irreversible` cases the dataset lacks. Laya's output only orders the list; it is never a label. The review UI shows the same score on each row (hover for reasons) and a **Time / Risk** toggle; with Risk on, Save moves to the next riskiest trace.
 
@@ -286,9 +326,29 @@ USE_TF=0 uv run --extra laya lgh train \
   --device cuda
 ```
 
-Visa alla tillgängliga träningsflaggor med `uv run lgh train --help`. Inlärningshastighet, gradientackumulering och valideringsandel har för närvarande inga CLI-flaggor. En träningskörning sparar modellen; för att använda den i daemonen behöver du ange modellvägen enligt instruktionerna nedan.
+Visa alla tillgängliga träningsflaggor med `uv run lgh train --help`. Inlärningshastighet, gradientackumulering, tålamod och slumpfrö kan anges med `--lr-encoder`, `--lr-head`, `--grad-accumulation`, `--patience` och `--seed`. En träningskörning sparar modellen; för att använda den i daemonen behöver du ange modellvägen enligt instruktionerna nedan.
 
 Training minimizes log loss (a strictly proper scoring rule) against the human labels, so probabilities stay calibratable; `noul` labels are soft targets (`0.2` trains toward 20 %). The newest 20 % of rows by timestamp are held out for validation and early stopping. Afterwards one temperature per question type and option count is fitted on that split and written into the checkpoint.
+
+For a new experiment, supply separate validation and calibration datasets:
+
+```bash
+USE_TF=0 uv run --extra laya lgh train --dataset train.jsonl \
+  --validation validation.jsonl --calibration calibration.jsonl \
+  --base /path/to/current-laya --output ./comparisons/laya-next --device cuda
+```
+
+With `--validation`, every `--dataset` row is training data. Validation selects
+weights; `--calibration` alone fits temperatures. Exact states, trace IDs and
+declared `group_id`/`session_id` values cannot cross partitions. A chronological
+split alone does not prevent related-session leakage. Keep a fourth, untouched
+test set for final comparison. Without a separate calibration file, the legacy
+workflow reuses validation and reports its calibration scores as optimistic.
+`lgh compare` audits the separate files recorded in the candidate checkpoint too;
+retain those files at their recorded paths for the audit.
+
+See [the versioned Laya improvement experiment](experiments/laya_v2/README.md)
+for an auditable synthetic curriculum, training commands, and measured limitations.
 
 The checkpoint lands in `~/.local/share/lgh/models/<UTC time>/` in Laya's own layout, with `report.json` comparing the base and fine-tuned model on the validation split (accuracy, log loss, Brier, ECE, recall per class). Read the warnings first: a class with fewer than 10 training examples will not be learned, and a class with no validation examples cannot be measured. Rare `replan` / `escalate` / `outside_scope` / `irreversible` cases come from labeling `lgh triage` candidates, not from training longer.
 

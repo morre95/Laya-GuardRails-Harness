@@ -39,9 +39,18 @@ class Session(FrozenModel):
     harness: HarnessName
 
 
+class InstructionContext(FrozenModel):
+    """Bounded, redacted user text captured at the time of the hook."""
+
+    messages: list[str] = Field(default_factory=list)
+    history_truncated: bool = False
+    text_truncated: bool = False
+
+
 class Task(FrozenModel):
     user_goal: str = Field(alias="userGoal")
     current_plan: str | None = Field(default=None, alias="currentPlan")
+    instruction_context: InstructionContext | None = Field(default=None, alias="instructionContext")
 
 
 class Repo(FrozenModel):

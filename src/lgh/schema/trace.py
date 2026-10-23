@@ -4,7 +4,7 @@ from pydantic import Field
 
 from lgh.schema.base import FrozenModel
 from lgh.schema.decision import GuardrailDecision
-from lgh.schema.envelope import LayaState
+from lgh.schema.envelope import InstructionContext, LayaState
 from lgh.schema.laya import LayaAssessment
 
 
@@ -36,6 +36,16 @@ class Outcome(FrozenModel):
     verification_passed: bool | None = Field(default=None, alias="verificationPassed")
 
 
+class ReviewContext(FrozenModel):
+    """Redacted source context; separate from the exact model input in state."""
+
+    goal: str
+    instructions: InstructionContext | None = None
+    command: str | None = None
+    plan: str | None = None
+    truncated_fields: list[str] = Field(default_factory=list)
+
+
 class DecisionTrace(FrozenModel):
     trace_id: str = Field(alias="traceId")
     timestamp: str
@@ -44,6 +54,7 @@ class DecisionTrace(FrozenModel):
     rule_evaluation: RuleEvaluation = Field(alias="ruleEvaluation")
     laya: LayaTrace | None = None
     state: LayaState | None = None
+    review_context: ReviewContext | None = Field(default=None, alias="reviewContext")
     policy_decision: GuardrailDecision = Field(alias="policyDecision")
     frontier: FrontierTrace | None = None
     human: HumanTrace | None = None

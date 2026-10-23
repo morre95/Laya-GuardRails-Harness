@@ -5,7 +5,7 @@ from typing import Any
 
 from lgh.adapters.claude_code.mapping import map_tool
 from lgh.adapters.claude_code.repo import inspect_repo
-from lgh.adapters.claude_code.transcript import last_user_goal
+from lgh.adapters.claude_code.transcript import goal_from_context, read_instruction_context
 from lgh.config.models import GuardrailConfig
 from lgh.ids import new_id, utc_now_iso
 from lgh.pipeline import EvaluationResult
@@ -50,13 +50,15 @@ def envelope_from_hook(
     recent: list[ActionSummary] = []
     if sessions is not None:
         recent = sessions.recent_summaries(session_id)[-5:]
+    instructions = read_instruction_context(payload.get("transcript_path"))
     return ActionEnvelope(
         schemaVersion="0.1",
         event=Event(id=new_id(), timestamp=utc_now_iso(), phase=phase),  # type: ignore[arg-type]
         session=Session(id=session_id, harness="claude-code"),
         task=Task(
-            userGoal=last_user_goal(payload.get("transcript_path")),
+            userGoal=goal_from_context(instructions),
             currentPlan=None,
+            instructionContext=instructions,
         ),
         repo=Repo(
             cwd=cwd,
