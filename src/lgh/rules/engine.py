@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import shlex
 from functools import lru_cache
 from typing import Any, Callable
 
@@ -189,10 +190,10 @@ def _git_items(parsed: list[ParsedCommand], env: ActionEnvelope) -> list[ParsedC
 
 def eval_git_readonly(env: ActionEnvelope, _cfg: GuardrailConfig, rule: dict, parsed: list[ParsedCommand]) -> bool:
     allowed = set(rule.get("git_subcommands") or [])
-    items = _git_items(parsed, env)
-    if not items:
+    argv = _simple_command(env, parsed)
+    if len(argv) < 2 or argv[0] != 'git' or argv[1] not in allowed:
         return False
-    return all((item.git_subcommand or "") in allowed for item in items)
+    return not any(arg.split('=')[0] in {'--output', '--ext-diff', '--textconv'} for arg in argv[2:])
 
 
 def eval_git_reset_hard(env: ActionEnvelope, _cfg: GuardrailConfig, _rule: dict, parsed: list[ParsedCommand]) -> bool:
@@ -243,6 +244,21 @@ def _command_text(env: ActionEnvelope) -> str:
     return (env.action.command or env.action.operation or "").strip()
 
 
+def _simple_command(env: ActionEnvelope, parsed: list[ParsedCommand]) -> list[str]:
+    """Fast ALLOW is only for a plain command, never a partial shell interpretation.
+
+    Quoted metacharacters are conservatively sent to semantic assessment too.
+    This is a shortcut boundary, not a general shell safety parser.
+    """
+    text = _command_text(env)
+    if env.action.tool not in {'shell', 'git'} or len(parsed) != 1 or any(char in text for char in ';&|<>$`\\\n\r'):
+        return []
+    try:
+        return shlex.split(text)
+    except ValueError:
+        return []
+
+
 def eval_known_command(env: ActionEnvelope, cfg: GuardrailConfig, rule: dict, parsed: list[ParsedCommand]) -> bool:
     kind = rule.get("command_kind")
     catalog = {
@@ -250,14 +266,26 @@ def eval_known_command(env: ActionEnvelope, cfg: GuardrailConfig, rule: dict, pa
         "lint": cfg.known_lint_commands,
         "typecheck": cfg.known_typecheck_commands,
     }[kind]
-    text = _command_text(env)
-    if any(text == cmd or text.startswith(cmd + " ") for cmd in catalog):
-        return True
-    for item in parsed:
-        joined = " ".join(item.argv)
-        if any(joined == cmd or joined.startswith(cmd + " ") for cmd in catalog):
-            return True
-    return False
+    argv = _simple_command(env, parsed)
+    if not argv:
+        return False
+    if kind == 'lint':
+        flags = {arg.split('=')[0] for arg in argv[1:]}
+        if flags & {'--fix', '--fix-only', '--unsafe-fixes', '--add-noqa', '--output-file', '--output', '-o', '--write', '-w', '--config'}:
+            return False
+        if any(arg.startswith('-o') for arg in argv[1:]):
+            return False
+        if argv[0] == 'ruff' and (len(argv) < 2 or argv[1] != 'check'):
+            return False
+    if kind == 'typecheck':
+        if any(a.split('=')[0] == '--createstub' for a in argv):
+            return False
+        if argv[0] == 'tsc' or argv[:2] == ['npx', 'tsc']:
+            writing_flags = {'--generateTrace', '--generateCpuProfile', '--incremental', '--tsBuildInfoFile', '--build', '-b'}
+            if ('--noEmit' not in argv or 'false' in argv or any(a.startswith('--out') for a in argv)
+                    or any(a.split('=')[0] in writing_flags for a in argv)):
+                return False
+    return any(argv[:len(prefix)] == prefix for cmd in catalog if (prefix := shlex.split(cmd)))
 
 
 def eval_package_install(env: ActionEnvelope, _cfg: GuardrailConfig, _rule: dict, parsed: list[ParsedCommand]) -> bool:
