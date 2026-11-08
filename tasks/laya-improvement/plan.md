@@ -2,14 +2,18 @@
 
 **Fortsättning 2026-11-08:** dataförbättring och GPT-6-Astra-styrd viktredigering.
 Se [experimentspecifikationen](weight-space-spec.md) och [tasks WS-00–WS-12](todo.md).
-Tidigare resultat nedan är historik; fortsättningen har ännu inga modellresultat.
+Tidigare resultat längre ned är historik; WS-05:s nya resultat finns i
+[weight-space-results.md](weight-space-results.md).
 WS-01–WS-03 samt WS-04:s öppna utvecklingsdata är verifierade. Poolen har
 202 syntetiska exempel i 90 familjer, grupperade till 83 odelbara enheter;
 train/development/validation/calibration är separerade och överlappskontrollerade.
 Användaren märker framtida verkliga sluttestfall. Åtkomstisolering saknas och
 är verifierat otillräcklig; sluttestdelen av WS-04 förblir öppen.
-Nästa möjliga modellsteg är WS-05 som **öppet utvecklingsförsök**, utan blinda
-utvärderingsanspråk. Oberoende granskning och mänskliga sluttestetiketter återstår.
+WS-05 är genomfört som **öppet utvecklingsförsök**: D förbättrar medelvärdet av
+balanserad träffsäkerhet 42,68→79,06 %, men introducerar ett nytt osäkert ALLOW
+och klarar inte säkerhetsgränsen. D är hash-låst för framtida DW; aktiv modell
+är oförändrad. Nästa task är WS-06:s begränsade vikt-/aktiveringsprobe.
+Oberoende granskning och mänskliga sluttestetiketter återstår.
 
 Compare a new fine-tune against the configured checkpoint `20261012T163824Z`.
 Keep the existing Laya/Kev plan and user edits intact. Do not switch the active

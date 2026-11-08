@@ -176,16 +176,37 @@ Taskstatus ska spegla faktisk evidens, inte att ett skript har skrivits.
 
 ### WS-05 — Kör referens och förbättrad vanlig finjustering [M]
 
-- [ ] Kör B och D från samma låsta bas med befintlig träningsloop och explicit
+- [x] Kör B och D från samma låsta bas med befintlig träningsloop och explicit
   validation/calibration; välj vikter endast med validation.
-- [ ] Spara inställningar, data-/vikthash, seed, historik, kostnad och development-
+- [x] Spara inställningar, data-/vikthash, seed, historik, kostnad och development-
   resultat. D blir den låsta utgångspunkten för DW.
-- [ ] Kontrollera komplett sju-frågorsinferens efter omladdning och redovisa
+- [x] Kontrollera komplett sju-frågorsinferens efter omladdning och redovisa
   regressioner även om medelresultatet förbättras.
 - Verifiering: befintliga träningstester samt verklig GPU-körning och omladdning;
   behåll alla misslyckade körningar i journalen. Sluttestet förblir stängt.
 - Beroenden: WS-04:s utvecklingsdata, kontrollpunkt A. Filer: experimentets
   `run_training.py`, `README.md`, `tasks/laya-improvement/weight-space-results.md`.
+- Verifierat 2026-11-08 som **öppet utvecklingsförsök** i
+  `comparisons/laya-weight-space/ws05-training-01/`. Ett försök, fyra epoker,
+  seed 0, 88 träningsfall; validation-loss väljer epok 4 (1,73474→0,33199).
+  B/D kalibreras med samma metod på 37 separata fall. Originalkalibrerad B
+  och temperatur-1-kontroller redovisas separat. Inga development-baserade återförsök.
+- 36 utvecklingsfall: medelbalanserad träffsäkerhet **42,68→79,06 %**, men
+  lika kalibrerad B→D ger osäkra ALLOW **0→1**, otillräcklig hantering **0→2**
+  och säkra avbrott **19→6**. Mot ursprunglig B blir osäkra ALLOW 11→1 men
+  samma nya osäkra fall tillkommer. Säkerhetsgränsen underkänns; ingen aktivering.
+  Fulla parade regressioner och kalibreringseffekt i [resultatet](weight-space-results.md).
+- D-vikter `35520ac2303f24ebcfa304f65cbe40ae272e18de9c786877359f9bf5ef3b098d`,
+  WS-05-manifest `7079beb3e74b95d97aba7cb7387dcd7e2e4968aaab8772422ffe33575270a5a5`.
+  D:s fulla checkpointidentitet är sparad som DW-förälder. Bas och aktiv config
+  oförändrade; inga W/DW-patchar eller sluttestfall. 134,40 s lokal körning,
+  noll nya API-anrop. GPU-toppen 8,35 GB allokerat; sessions-/elkostnad okänd.
+- Sju nya tester, fokuserat **16 passed**, hela sviten **369 passed** (44,89 s).
+  Verklig CUDA-träning/omladdning, komplett sju-frågorsinferens, filhashar,
+  `uv build --offline` och `git diff --check` passerade. Misslyckade körningar
+  journalförs och bevaras; detta faktiska modellförsök lyckades utan återförsök.
+- Nästa task: WS-06. WS-04:s sluttest/isolering förblir öppna; resultaten ovan
+  är syntetisk utvecklingsevidens och bevisar inte en korrigerbar viktmekanism.
 
 ### WS-06 — Ge Astra en minimal vikt- och aktiveringsprobe [M]
 

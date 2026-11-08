@@ -4,7 +4,8 @@ Experimentets [specifikation](../../tasks/laya-improvement/weight-space-spec.md)
 [plan](../../tasks/laya-improvement/plan.md) och
 [tasklista](../../tasks/laya-improvement/todo.md) beskriver B/D/W/DW-jämförelsen.
 Här finns WS-01:s inventering, WS-02:s frysta protokoll och utvärdering,
-WS-03:s kontrastdata och WS-04:s utökning, överlappsaudit och partitionering.
+WS-03:s kontrastdata, WS-04:s utökning, överlappsaudit och partitionering samt
+WS-05:s lokala B/D-träning och parade utvecklingsjämförelse.
 
 ## Kör WS-01
 
@@ -325,3 +326,60 @@ Spara inte framtida sluttestinnehåll i aktuell agents läsbara arbetsyta eller 
 Verifierat: 28 fokuserade tester, **362 tester** i hela sviten, offline-paketbygge,
 artefakt-/källkodshashar och oförändrat WS-02-protokoll. Full täckning och
 begränsningar finns i [datagranskningen](data-review.md).
+
+## WS-05: vanlig finjustering och jämförbar B/D-inferens
+
+```bash
+USE_TF=0 OMP_NUM_THREADS=4 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+  .venv/bin/python -m experiments.laya_weight_space.run_training \
+  --protocol comparisons/laya-weight-space/ws02-protocol-01/protocol.json \
+  --partitions comparisons/laya-weight-space/ws04-partitions-03 \
+  --output comparisons/laya-weight-space/ws05-training-next
+```
+
+Kräver befintlig Astra-session och CUDA-åtkomst. Ingen modell laddas ned.
+CLI använder befintliga `TrainSettings`: fyra epoker, encoder-lärhastighet
+1e-5, head-lärhastighet 1e-4, ackumulering över åtta fall, patience 1 och seed 0.
+En körning deklarerar ett träningsförsök före inferens i `plan.json`; bästa
+validation-förlust väljer vikterna, inklusive epok noll som möjlig vinnare.
+Inställningar anpassas inte efter development-utfallet. Seed och paketversioner
+registreras; bitidentisk CUDA-reproduktion är inte utlovad.
+
+Den befintliga träningsloopen tränar encoder och beslutskomponenter med fryst
+act-head. `runner.py` använder explicit validation/calibration och sparar D i
+en ny mapp. Kalibreringen använder `fit_bucket_temperatures` på samma 37 fall
+för B och D: temperaturer per frågetyp/optionsantal, rutnät 0,05–5,00, minsta
+log loss. B kopieras byte för byte och endast temperaturkonfigurationen ändras.
+Den aktiva modellens ursprungliga checkpoint och LGH-konfiguration bevaras.
+
+Efter omladdning samlas samtliga sju svar för varje development-fall:
+
+- **B/D:** samma separata kalibreringsdata och metod, olika frysta vikter.
+- **B_operational:** ursprungliga B-vikter och temperaturer.
+- **B_unit_temperature/D_unit_temperature:** diagnostiska kontroller med alla
+  använda Laya-temperaturer satta till 1 i minnet; kontrollens override anges
+  uttryckligen i identiteten. LGH:s extra normalisering är fryst i protokollet.
+
+`predictions.json`, `routing.json` och `report.json` bevarar svar, identiteter,
+klassmått och parade förbättringar/regressioner för all/rule-PASS/rule-controlled
+och semantic-only. B→D och kalibreringskontroller använder WS-02:s befintliga
+mått och reducer. Formatet är ett WS-05-utvecklingsresultat, inte WS-02:s
+fyrgrensformat: inga påhittade W/DW-prediktioner skapas. Rapporten väljer aldrig
+en modell för aktivering. Uppgifter om verklig exekvering eller reviewers saknas.
+
+`journal.jsonl` registrerar framsteg och fel; `failure.json` bevarar ett avbrutet
+försök. Befintliga outputmappar avvisas. Det avslutande manifestet binder
+samtliga filer och pekar ut D:s låsta checkpoint för framtida DW. D:s interna
+`report.json` innehåller träningshistorik och validation-mått; använd den yttre
+rapporten för jämförbar B/D-kalibrering och utvecklingsresultat.
+
+```bash
+USE_TF=0 OMP_NUM_THREADS=4 .venv/bin/python -m pytest \
+  tests/unit/test_weight_space_training.py tests/unit/test_train_partitions.py \
+  tests/unit/test_train_loop.py -q
+```
+
+Se [WS-05-resultatet](../../tasks/laya-improvement/weight-space-results.md) för
+den faktiska körningen, regressionerna och begränsningarna. Nästa steg är WS-06,
+vikt-/aktiveringsprobe med budgeträkning; sluttestet väntar fortsatt på nya fall
+som användaren märker och på faktisk åtkomstisolering.
