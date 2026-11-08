@@ -208,6 +208,13 @@ def rule_config_hash(config: GuardrailConfig) -> str:
 
 def read_inputs(dataset: Path, replay: Path, experiment: Experiment, *, labels: Path | None = None,
                 unlabeled: bool = False) -> tuple[list[dict], list[ReplayCase]]:
+    return read_inputs_with_config(dataset, replay, experiment.config, labels=labels, unlabeled=unlabeled)
+
+
+def read_inputs_with_config(dataset: Path, replay: Path, config: GuardrailConfig, *,
+                            labels: Path | None = None, unlabeled: bool = False
+                            ) -> tuple[list[dict], list[ReplayCase]]:
+    """Validate captured replay inputs independently of the model comparison roster."""
     try:
         rows = read_dataset(dataset, labels=labels, unlabeled=unlabeled)
         expected = load_questions()
@@ -224,7 +231,7 @@ def read_inputs(dataset: Path, replay: Path, experiment: Experiment, *, labels: 
         by_id = {c.trace_id: c for c in cases}
         if len(by_id) != len(cases) or set(by_id) != {r['trace_id'] for r in rows}:
             raise DatasetError('replay must join dataset exactly once per trace_id')
-        config_hash = rule_config_hash(experiment.config)
+        config_hash = rule_config_hash(config)
         ordered = []
         for row in rows:
             c = by_id[row['trace_id']]

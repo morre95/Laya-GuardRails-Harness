@@ -3,8 +3,13 @@
 **Fortsättning 2026-11-08:** dataförbättring och GPT-6-Astra-styrd viktredigering.
 Se [experimentspecifikationen](weight-space-spec.md) och [tasks WS-00–WS-12](todo.md).
 Tidigare resultat nedan är historik; fortsättningen har ännu inga modellresultat.
-WS-01 är verifierad: lokal Astra-session, CPU/CUDA-probe och upprepad
-checkpointinventering. Nästa leverans är WS-02:s utvärderingskontrakt.
+WS-01–WS-03 samt WS-04:s öppna utvecklingsdata är verifierade. Poolen har
+202 syntetiska exempel i 90 familjer, grupperade till 83 odelbara enheter;
+train/development/validation/calibration är separerade och överlappskontrollerade.
+Användaren märker framtida verkliga sluttestfall. Åtkomstisolering saknas och
+är verifierat otillräcklig; sluttestdelen av WS-04 förblir öppen.
+Nästa möjliga modellsteg är WS-05 som **öppet utvecklingsförsök**, utan blinda
+utvärderingsanspråk. Oberoende granskning och mänskliga sluttestetiketter återstår.
 
 Compare a new fine-tune against the configured checkpoint `20261012T163824Z`.
 Keep the existing Laya/Kev plan and user edits intact. Do not switch the active

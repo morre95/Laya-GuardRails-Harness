@@ -69,33 +69,74 @@ Taskstatus ska spegla faktisk evidens, inte att ett skript har skrivits.
 
 ### WS-02 — Lås utvärderingskontraktet [M]
 
-- [ ] Definiera B/D/W/DW-identiteter, gruppindelning, budgeträkning, fasta
+- [x] Definiera B/D/W/DW-identiteter, gruppindelning, budgeträkning, fasta
   policyparametrar och pilotgränsen före mätning.
-- [ ] Implementera parade regressionsmått för alla fall och rule-PASS; håll
+- [x] Implementera parade regressionsmått för alla fall och rule-PASS; håll
   semantisk ablation separat och använd oberoende accepterade routingbeslut.
-- [ ] Frys replay-kontext och fullständiga falljoinar; verkliga fall med saknad
+- [x] Frys replay-kontext och fullständiga falljoinar; verkliga fall med saknad
   kontext får inte rekonstrueras som om de vore fångade händelser.
 - Verifiering: fixture med bättre genomsnitt men ett nytt osäkert ALLOW måste
   misslyckas mot pilotgränsen; ändrad policy/hash och saknade fall avvisas.
 - Beroenden: WS-01. Filer: experimentets `protocol.py`, `evaluate.py`,
   `tests/unit/test_weight_space_evaluate.py`, experimentets `README.md`.
+- Verifierat 2026-11-08: protokollet finns i
+  `comparisons/laya-weight-space/ws02-protocol-01/protocol.json`, identitet
+  `872ab384bf7ef3d59af38747c060b90a8590bc867a64852c4726955f7134ed58`.
+  Bas och effektiv konfiguration jämfördes med WS-01 före/efter frysning.
+- `protocol.py` låser budgetdefinition, B:s identitet, B/D/W/DW:s föräldrar,
+  kalibreringsmetod, gruppregler, frågor, policy och utvärderingskod. Framtida
+  kandidatidentiteter och verkliga partitioner står uttryckligen som väntande.
+  Den existerande replay-valideringen fick en återanvändbar ingång med config
+  i `src/lgh/eval/backend_contract.py`; Laya/Kev-gränssnittet behåller sitt beteende.
+- `evaluate.py` jämför kompletta sparade prediktioner med regler + reducer,
+  och redovisar all/rule-PASS/rule-controlled samt separat semantic-only.
+  B→D, B→W, D→DW och B→DW innehåller parade fall-id:n och explicita nämnare.
+  Valfri B_operational kontrollerar originalkalibreringen. Inga handlingar,
+  reviewers, regelsökningar eller sessionstillståndsövergångar körs.
+- CLI-smoke i `comparisons/laya-weight-space/ws02-smoke-01/`: fyra syntetiska
+  fall med deterministiska etiketter och förutbestämda svar. B→D förbättrar
+  osäkra ALLOW 2→1 men skapar ett nytt (`case-2`), och underkänns. Detta är
+  verifiering av utvärderingskoden, inte resultat för verkliga Laya-modeller.
+- 28 nya tester. Fokuserad verifiering: **61 passed**; full regression med
+  localhost-/GPU-åtkomst: **334 passed** (43,04 s). `uv build --offline`,
+  dokumentlänkar och `git diff --check` passerade.
+- Gränser: WS-02 definierar budgeträkning; verktygsräknaren kommer i WS-06.
+  Modellidentiteter i sparade prediktioner är insamlarens deklarationer tills
+  WS-05–WS-10 verifierar inferensinsamlingen. Data-/överlappsaudit kommer i WS-04,
+  nytt sluttest och gruppbaserad osäkerhet i WS-11. Rapporter från denna task
+  ger därför aldrig ett aktiveringsbeslut, även när den observerade gränsen passeras.
+- Nästa task: WS-03, granskade kontrastfamiljer för överskrivningsfel.
 
 ### WS-03 — Bygg ett granskningsbart underlag för överskrivningsfel [M]
 
-- [ ] Ta fram kontrastfamiljer för nytt/befintligt/osparat innehåll, uttryckligt
+- [x] Ta fram kontrastfamiljer för nytt/befintligt/osparat innehåll, uttryckligt
   uppdrag, diffgranskning och återställning, med riktiga verktygsformat.
-- [ ] Korrigera kända etikettproblem i en ny datasetversion; behörighet får inte
+- [x] Korrigera kända etikettproblem i en ny datasetversion; behörighet får inte
   i sig avgöra återställbarhet. Dokumentera varje etikett och dess källa.
-- [ ] Visa exakt modellinput för granskaren; exkludera otillräcklig kontext och
+- [x] Visa exakt modellinput för granskaren; exkludera otillräcklig kontext och
   redovisa täckning över alla sju frågor och klasser.
 - Verifiering: granska kontrastpar utan modellutfall; kontrollera schema, källa,
   motiveringar och klassstöd mot insamlingsmålen i specifikationen.
 - Beroenden: WS-02. Filer: experimentets `curriculum.py`, `build_dataset.py`,
   `tests/unit/test_weight_space_data.py`, `data-review.md`.
+- Verifierat 2026-11-08: `comparisons/laya-weight-space/ws03-pool-02/` innehåller
+  72 frontier-märkta syntetiska exempel i 36 kontrastfamiljer; sex exempel
+  uteslutna utan etiketter. Alla sju frågor och klasser har stöd. 504 faktiska
+  frågesekvenser ryms utan kapning, högst 186 av 1 024 token. Basens identitet
+  matchar före/efter. Ingen inferens eller modellträning i databyggandet.
+- Självgranskning och begränsningar i
+  [data-review.md](../../experiments/laya_weight_space/data-review.md).
+  Mänsklig/oberoende granskning återstår; poolen är ännu opartitionerad.
+  13 nya tester täcker bland annat bortfall, källa, etiketter och dubbletter.
+- Slutkontroll: **347 passed** (49,01 s), `uv build --offline`, artefakt- och
+  källkodshashar samt `git diff --check` passerade. Fullsvitens befintliga
+  träning-smoke använde en tillfällig checkpoint; det är inget D-försök.
 
 ### WS-04 — Separera data och förbered ett nytt sluttest [M]
 
-- [ ] Skapa train/development/validation/calibration med grupper som hålls ihop;
+- [x] Utöka poolen med minst 39 ytterligare kontrastfamiljer och stärk svaga
+  klasser; nå minst 75 användbara familjer efter audit för målen 30/15/15/15.
+- [x] Skapa train/development/validation/calibration med grupper som hålls ihop;
   auditera mot ärvda dataset och kända historiska tester.
 - [ ] Förbered nya mänskligt märkta verkliga testfall och separat syntetiskt
   underlag hos en granskare utanför optimerarens kontext. Spara replay-sidecar.
@@ -105,12 +146,33 @@ Taskstatus ska spegla faktisk evidens, inte att ett skript har skrivits.
   rättigheter från Astra-miljön och rapportera faktisk täckning och bortfall.
 - Beroenden: WS-03. Filer: experimentets `partitions.py`, `build_dataset.py`,
   `tests/unit/test_weight_space_data.py`, `data-review.md`.
+- Öppen utvecklingsdel verifierad 2026-11-08. `curriculum_ws04.py` tillför
+  54 familjer; `ws04-pool-02` har 202 exempel/90 familjer och sex bortfall.
+  Sju semantiska länkar ger 83 odelbara grupper. `ws04-partitions-03` fördelar
+  dem 38/15/15/15 och exemplen 88/36/41/37. Alla klasser finns i varje partition;
+  sex träningsklasser har fortfarande färre än tio exempel och varnas uttryckligen.
+- Tio historiska filer, 2 406 rader, granskade utan exakt trace-/state-/gruppöverlapp.
+  Okänd förträning, saknade historiska sessions-id:n och semantisk osäkerhet kvarstår.
+  Kompletta syntetiska replay-sidecars är fångade och validerade; inga handlingar körda.
+- Användaren har bekräftat att användaren märker framtida verkliga sluttestfall.
+  Ingen isolerad miljö finns. Läsproben kunde läsa validation/calibration;
+  manifestet är därför `open_development_only`, `blind_evaluation_ready: false`.
+  Insamlingskontrakt och tom mänsklig märkningsmall är skapade; noll sluttestfall
+  finns ännu. De två sluttest-/isoleringspunkterna ovan förblir öppna.
+- 15 nya tester i `tests/unit/test_weight_space_partitions.py`:
+  transitiva gruppgränser, alla identitetsöverlappar, historik, reproducerbarhet,
+  klassstöd, filintegritet, replay och ärlig åtkomststatus. Fokuserat **28 passed**;
+  hela sviten **362 passed** (45,26 s). `uv build --offline`, hashkontroller,
+  dokumentlänkar och `git diff --check` passerade. Bas och fryst protokoll matchar.
+- Nästa möjliga modelltask: WS-05 som öppet B/D-utvecklingsförsök enligt
+  specifikationens uttryckliga väg när isolering saknas. Inga blinda testanspråk.
 
 ### Kontrollpunkt A — Data och protokoll
 
-- [ ] Identiteter, budget och utvecklingspartitioner klara; testansvar och isolering
+- [x] Identiteter, budget och utvecklingspartitioner klara; testansvar och isolering
   dokumenterade. Redovisa väntande mänsklig märkning separat.
-- [ ] WS-01–WS-04:s tillämpliga kontroller passerar innan modellförsök.
+- [x] WS-01–WS-04:s kontroller för öppna utvecklingsförsök passerar innan modellförsök.
+- [ ] Nytt sluttest och faktisk åtkomstisolering klara innan blind slututvärdering.
 
 ### WS-05 — Kör referens och förbättrad vanlig finjustering [M]
 
