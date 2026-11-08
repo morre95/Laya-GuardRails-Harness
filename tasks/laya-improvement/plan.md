@@ -1,5 +1,11 @@
 # Laya improvement experiment
 
+**Fortsättning 2026-11-08:** dataförbättring och GPT-6-Astra-styrd viktredigering.
+Se [experimentspecifikationen](weight-space-spec.md) och [tasks WS-00–WS-12](todo.md).
+Tidigare resultat nedan är historik; fortsättningen har ännu inga modellresultat.
+WS-01 är verifierad: lokal Astra-session, CPU/CUDA-probe och upprepad
+checkpointinventering. Nästa leverans är WS-02:s utvärderingskontrakt.
+
 Compare a new fine-tune against the configured checkpoint `20261012T163824Z`.
 Keep the existing Laya/Kev plan and user edits intact. Do not switch the active
 daemon until the evidence supports the candidate.
@@ -65,3 +71,39 @@ Regression tests for invalid labels, split leakage and partial accumulation;
 existing tests; actual GPU training and checkpoint reload; independent review;
 saved prediction-level comparison and reproducible run commands. Baseline:
 222 tests passed, 1 GPU smoke test deselected (run separately during validation).
+
+## Fortsättning: genomförandeordning
+
+Användarens hypotes är att både databrister och en korrigerbar mekanism bidrar.
+Pröva B/D/W/DW enligt specifikationen, med överskrivning av befintligt arbete
+som första feltyp. Utöka detta befintliga arbete; den separata Laya/Kev-planen
+i `tasks/plan.md` och dess öppna uppgifter behåller sin egen arbetskö.
+
+1. **WS-00–WS-02: start och genomförbarhet.** Dokumentera utgångsläget, lås bas,
+   inventera Astra-åtkomst och fastställ utvärderingskontrakt. Första stoppunkt:
+   inga viktförsök innan identiteter, budget och datagränser är konkreta.
+2. **WS-03–WS-04: data.** Skapa granskade kontraster och separata partitioner.
+   Sluttestet hålls utanför optimerarens åtkomst. Första leveransen är ett
+   granskningsbart dataset och en datakvalitetsrapport, inte en ny modell.
+3. **WS-05–WS-07: jämförelse och viktverktyg.** Kör B/D, bygg en minimal lokal
+   probe och verifiera reversibla patchar. Patchverktyget kan utvecklas medan
+   datamärkning pågår; modellförsök väntar på godkända data och fryst protokoll.
+4. **WS-08–WS-10: redigering och kalibrering.** Kör W, undersök om effekten
+   överlever kontroller, kör DW och frys kandidaterna. Kalibrera alla med samma
+   metod. Ingen finalist får ändras efter att sluttestet öppnats.
+5. **WS-11–WS-12: slututvärdering och beslut.** Mät på nya verkliga fall samt
+   separat syntetisk utmaning, granska parade regressioner och dokumentera
+   nästa steg. Produktionsaktivering är en separat senare åtgärd.
+
+Återanvänd `src/lgh/train/{data,loop,runner,checkpoint,evaluate}.py` och befintlig
+eval/replay-kod. Bygg ingen generell agentplattform för första försöket.
+Alla framtida filnamn i tasklistan är planerade, inte redan fungerande verktyg.
+
+| Risk | Hantering |
+|---|---|
+| Modellen saknar kunskap snarare än har ett lokalt fel | Behåll datagrenen, kräv kontrollförsök och redovisa utebliven redigeringseffekt |
+| Sökningen överanpassas till kända fall | Begränsad sökbudget, separat validation, nytt isolerat sluttest |
+| Kalibrering förväxlas med viktförbättring | Samma kalibreringsmetod i alla grenar och extra operativ B-referens |
+| Ärvt träningsläckage | Auditera även basens tillgängliga exporthistorik; okända delar förblir okända |
+| Bättre snitt döljer nya farliga beslut | Parade fall, rule-PASS och strikt pilotgräns enligt specifikationen |
+| Astra eller mänskliga referenser saknas | Fortsätt oberoende verktygsarbete; lämna modell-/sluttesttasks öppna |
