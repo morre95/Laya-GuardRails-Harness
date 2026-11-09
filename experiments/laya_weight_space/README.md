@@ -383,3 +383,108 @@ Se [WS-05-resultatet](../../tasks/laya-improvement/weight-space-results.md) för
 den faktiska körningen, regressionerna och begränsningarna. Nästa steg är WS-06,
 vikt-/aktiveringsprobe med budgeträkning; sluttestet väntar fortsatt på nya fall
 som användaren märker och på faktisk åtkomstisolering.
+
+## WS-06: budget och observationsprobe
+
+`budget.py` håller en persistent, hashförseglad logg per gren/försök. Hela
+anropet reserveras före inferens: högst 20 anrop, 64 fall per anrop och 1 280
+fallexponeringar; samma fall räknas igen vid upprepning. Patchförslag har en
+separat gräns på 10. Misslyckade anrop återbetalas inte. Avbrutna processer med
+en kvarvarande `running`-reservation stoppar fortsatt körning för utredning.
+Fyll aldrig i en ny tom logg för att fortsätta samma försök.
+
+En separat fillåsfil och atomisk ersättning skyddar uppdateringar mellan
+processer. Loggen är lokal bokföring, inte en säkerhetsgräns mot en användare
+som kan skriva om både logg och hash. `tool_smoke` finns för fixtures; den
+verkliga utvecklingssmoken debiterar **W:s ordinarie sökbudget**.
+
+`probe.run_probe` tar en laddad eval-modell och redan validerade, kompletta
+train/development-fall med replay-referenser. Anroparen ansvarar för bindningen
+till checkpoint och tillåten partition; `smoke.py` visar den verifierade vägen.
+Proben returnerar samtliga sju svar, fel per fråga, fryst reducerbeslut och
+feltyperna osäkert ALLOW, otillräcklig hantering och säkert avbrott. Ingen
+regelmatchning eller inspelad handling körs.
+
+Välj högst åtta exakta tensorer och fyra namngivna moduler med tensoroutput,
+exempelvis `scorer.3.weight`, `scorer.3.bias`, `type_emb` och `scorer.3`.
+Rapporten innehåller form, datatyp, antal, min/max, medel, standardavvikelse och
+L2-norm; inga fulla tensorer, states eller envelopes. Aktiveringar kopplas till
+fall-id. Hela modellens tensorer/buffertar jämförs med bitbaserad hash före/efter.
+Hooks returnerar inget och avlägsnas i `finally`, även vid fel.
+
+Varje fall kör alla sju frågor i ett forward-anrop. En pre-hook journalför
+försöket, frågebatchens storlek och enhet före beräkning, även om forward sedan
+misslyckas. Interna återförsök avvisas före en andra forward; ett nytt försök
+kräver en ny budgetreservation. Endast inference-körningar genom dessa verktyg
+räknas automatiskt; WS-08/10 måste använda samma väg och logg för samtliga prober.
+
+## WS-07: exakta och reversibla viktpatchar
+
+`patch.py` läser originalet utan att skriva till det. Ersättningar levereras som
+en safetensors-fil med exakta tensornamn och fullständiga nya tensorvärden.
+Basens fulla checkpointidentitet, en uttrycklig tillåtelselista och en hypotes
+krävs. Första sökområdet är `type_emb.*`, `head.*` och `scorer.*`.
+Encoder-tensorer kräver dessutom dokumenterad probe-evidens; temperatur och
+act-head kan inte ändras med detta verktyg.
+
+```bash
+.venv/bin/python -m experiments.laya_weight_space.patch apply \
+  --base /path/to/frozen-checkpoint \
+  --expected-base-sha256 FULL_CHECKPOINT_SHA256 \
+  --replacements /path/to/replacements.safetensors \
+  --allow-tensor scorer.3.bias --hypothesis 'Declared hypothesis' \
+  --output comparisons/laya-weight-space/new-patch
+
+.venv/bin/python -m experiments.laya_weight_space.patch restore \
+  --base /path/to/frozen-checkpoint \
+  --patch-directory comparisons/laya-weight-space/new-patch \
+  --output comparisons/laya-weight-space/new-restoration
+```
+
+Verktyget avvisar befintlig målmapp, mål inne i basen, checkpointsymlänkar,
+fel bas, okända/otillåtna tensorer, ändrade former/datatyper samt NaN/Inf.
+`checkpoint/`, `replacements.safetensors` och ett förseglat manifest sparas i
+den nya patchmappen. Manifestet binder bas, payload, resultat, källkod, antal
+ändrade parametrar och normer. Bitförändringar inklusive `+0.0`→`-0.0` räknas.
+En nollpatch bevarar originalets filbytes. Safetensors verifieras vid skrivning;
+full Laya-omladdning verifieras separat i smoken. Fel efter att mappen skapats
+bevaras som ett misslyckat försök.
+
+Återställning skapar en ny byte-identisk kopia av den verifierade basen och
+kontrollerar även kandidat/payload. Ingen flyttalssubtraktion används och ingen
+befintlig kandidat skrivs över. Verktyget registrerar inte sökförslag automatiskt:
+WS-08/10 måste reservera varje förslag med `Budget.proposal` före patchförsöket.
+
+## Gemensam verklig smoke för WS-06/07
+
+```bash
+USE_TF=0 OMP_NUM_THREADS=4 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+  .venv/bin/python -m experiments.laya_weight_space.smoke \
+  --protocol comparisons/laya-weight-space/ws02-protocol-01/protocol.json \
+  --partitions comparisons/laya-weight-space/ws04-partitions-03 \
+  --output comparisons/laya-weight-space/ws06-ws07-smoke-next \
+  --budget comparisons/laya-weight-space/ws06-w-search-budget.json
+```
+
+Kräver verifierad Astra-session och lokal CUDA. Läser bara development-dataset
+och replay, inte validation/calibration/test. De första två development-fallen
+väljs före inferens; `--cases` kan väljas uttryckligen inom protokollets gräns.
+Layas laddare kan skriva tokenizerkonfiguration, därför laddas alltid en
+separat kopia och både filbytes och laddade tensorer verifieras.
+
+Fem körningar jämförs med fördeklarerad absolut tolerans **0**: före hooks,
+med hooks, efter hooks, omladdad nollpatch och omladdad återställning. Bas och
+aktiv konfiguration kontrolleras före/efter. Plan, svar, budgetsnapshot,
+felrapport vid misslyckande och filmanifest bevaras. Den levande budgetloggen
+ligger utanför manifestets frysta fillista; rapportens snapshot är oföränderlig.
+En ny outputmapp är inte en ny sökbudget: fortsätt med `--budget`.
+
+```bash
+OMP_NUM_THREADS=4 .venv/bin/python -m pytest \
+  tests/unit/test_weight_space_probe.py tests/unit/test_weight_space_patch.py -q
+```
+
+PyTorch-hookarnas observations- och borttagningskontrakt kontrollerades via
+Context7 mot [PyTorch Module](https://github.com/pytorch/pytorch/blob/main/torch/nn/modules/module.py)
+och [eval/inference-dokumentationen](https://github.com/pytorch/pytorch/blob/main/docs/source/notes/autograd.md).
+Inga nya beroenden eller produktionskodvägar infördes.

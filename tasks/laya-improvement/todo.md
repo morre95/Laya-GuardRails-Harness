@@ -210,31 +210,69 @@ Taskstatus ska spegla faktisk evidens, inte att ett skript har skrivits.
 
 ### WS-06 — Ge Astra en minimal vikt- och aktiveringsprobe [M]
 
-- [ ] Inspektera namngivna tensorer och utvalda aktiveringar; koppla prober till
+- [x] Inspektera namngivna tensorer och utvalda aktiveringar; koppla prober till
   utvecklingsfall och avlägsna hooks efter varje körning.
-- [ ] Returnera prediktioner för sju frågor, feltyper och relevanta sammanfattningar;
+- [x] Returnera prediktioner för sju frågor, feltyper och relevanta sammanfattningar;
   begränsa output så att hela vikter/privata traces inte dumpas i prompten.
-- [ ] Räkna alla modellkörningar, även prober, och avvisa anrop över sökbudgeten.
+- [x] Räkna alla modellkörningar, även prober, och avvisa anrop över sökbudgeten.
 - Verifiering: små fixtures testar budget, felvägar och hook-städning; verklig
   smoke bekräftar att enbart observation inte ändrar prediktioner/vikter.
 - Beroenden: WS-01, WS-02, WS-04:s utvecklingsdata. Filer: experimentets
   `probe.py`, `budget.py`, `tests/unit/test_weight_space_probe.py`, `README.md`.
+- Verifierat 2026-11-09: `probe.py` returnerar alla sju svar, frågefel, frysta
+  routingfel och begränsade tensor-/aktiveringssammanfattningar per fall.
+  Observationshooks avlägsnas även vid fel; tensorhash kontrolleras före/efter.
+  `budget.py` reserverar anrop före inferens, bevarar misslyckanden och räknar
+  faktiska forward-försök/frågebatcher. Interna återförsök kräver ny reservation.
+- Gemensam GPU-smoke i `comparisons/laya-weight-space/ws06-ws07-smoke-03/`
+  använder slutversionen av verktygen och två förvalda development-fall.
+  Före/med/efter hooks gav identiska svar och tensorhashar. Sju frågor per fall;
+  ingen validation/calibration/test lästes. Bas och aktiv konfiguration oförändrade.
+- W:s fortsättningslogg är `comparisons/laya-weight-space/ws06-w-search-budget.json`.
+  Den inkluderar både smoke-02 och smoke-03: **10/20 anrop**, **20/1 280
+  fallexponeringar**, 20 forward-försök à sju frågor och **0/10 patchförslag**.
+  WS-08 måste återanvända denna logg; ny outputmapp återställer inte budgeten.
+  Smoke-01 saknade CUDA i sandlådan och stoppade före inferens; felartefakten
+  finns kvar. Ingen ny modell-API-kostnad; sessions-/elkostnad okänd.
+- 11 nya probe-/budgettester och 14 patchtester (WS-07), totalt **25 passed**.
+  Hela sviten med localhost-/GPU-åtkomst: **394 passed** (48,84 s).
+  `uv build --offline` passerade med befintlig cache; temporär cache saknade
+  hatchling. Artefakthashar och slutversionens källkodshashar verifierades.
 
 ### WS-07 — Skapa reversibla och verifierbara viktpatchar [M]
 
-- [ ] Läs basen skrivskyddat; tillämpa bara deklarerade tensorändringar i en kopia
+- [x] Läs basen skrivskyddat; tillämpa bara deklarerade tensorändringar i en kopia
   och spara bas-/patch-/resultathash, ändringsantal och normer.
-- [ ] Avvisa fel bas, NaN/Inf, formfel, otillåtna tensorer och befintlig målmapp.
-- [ ] En sparad kandidat kan laddas; återgång återställer basens tensorer exakt.
+- [x] Avvisa fel bas, NaN/Inf, formfel, otillåtna tensorer och befintlig målmapp.
+- [x] En sparad kandidat kan laddas; återgång återställer basens tensorer exakt.
 - Verifiering: negativa tester med små tensorer; verklig nollpatch bevarar
   modelloutput inom deklarerad numerisk tolerans. Originalets hash är oförändrad.
 - Beroenden: WS-01, WS-02. Filer: experimentets `patch.py`,
   `tests/unit/test_weight_space_patch.py`, `README.md`.
+- Verifierat 2026-11-09: patchar anger exakta ersättningstensorer, tillåtna namn,
+  hypotes och basidentitet. Ny checkpoint/payload/manifest binds med hash och
+  parameterantal/normer. Återgång kopierar verifierade originalbytes till en
+  ny mapp. Originalet laddas aldrig direkt av Layas potentiellt skrivande laddare.
+- 14 tester omfattar negativa fall, bitexakt ändring/återställning, nollpatch,
+  symlänkar och skrivskyddad viktfil. Oberoende granskning hittade `+0.0`→`-0.0`;
+  regressionstestet reproducerade felet före rättning till bitjämförelse.
+  En avsiktligt inverterad bashashkontroll fångades av testet och återställdes.
+- Gemensamma `smoke.py` verifierade verklig nollpatch och omladdad återställning
+  på RTX 3090, med absolut tolerans **0** och identiska svar/tensorhashar.
+  Slutlig smoke-03 tog **80,63 s**, topp **1 744 502 272 GPU-byte** allokerat.
+  Smoke-02 tog 76,74 s; dess fem anrop behölls i fortsättningsbudgeten när
+  slutversionen verifierades på nytt. Båda körningarnas 46 artefaktfiler verifierade.
+- Slutmanifest: `a7abbd4e775022256a9c3f505e40260df5066fed19405486752324fa349cab50`.
+  Ingen riktad W/DW-kandidat, mekanismvinst eller aktivering påstås. Kontrollpunkt
+  B:s verktygsdel är verifierad; åtkomstisoleringen återstår enligt WS-04.
 
 ### Kontrollpunkt B — Verktygen fungerar på en verklig modell
 
 - [ ] B/D-artefakter och probe-/patch-smoke verifierade; testdata otillgängliga.
-- [ ] Öppna verktygsfel åtgärdade innan Astra får föreslå riktiga viktändringar.
+- [x] Öppna verktygsfel åtgärdade innan Astra får föreslå riktiga viktändringar.
+- WS-06/07:s verktyg och GPU-smoke är klara. Första punkten förblir öppen:
+  faktisk åtkomstisolering saknas. Eventuell fortsatt W/DW-körning måste uttryckligen
+  vara ett öppet utvecklingsförsök enligt specifikationen, utan blindanspråk.
 
 ### WS-08 — Pröva riktad viktredigering på B [M]
 
